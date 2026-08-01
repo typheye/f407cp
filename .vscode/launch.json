@@ -4,7 +4,7 @@
         {
             "name": "DAPLink Debug",
             "cwd": "${workspaceRoot}",
-            "executable": "${workspaceRoot}\\build\\Release\\tos.elf",
+            "executable": "${workspaceRoot}\\build\\Release\\f407cp.elf",
             "request": "launch",
             "type": "cortex-debug",
             "svdFile": "${workspaceRoot}/STM32F407.svd",
