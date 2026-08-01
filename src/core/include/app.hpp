@@ -25,7 +25,10 @@
 
 // ── Hardware headers ──────────────────────────────────────────
 #include "include/buzzer.hpp"
+#include "include/button.hpp"
 #include "include/led.hpp"
+#include "include/ssd1315.hpp"
+#include "include/liboledgfx.h"
 #include "include/libvan.h"
 
 #include "main.h"

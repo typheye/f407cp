@@ -20,7 +20,13 @@
  *
  */
 
-#include "tee_format.h"
+#include <stdint.h>
+
+/* Size of the TOS image header, in bytes. Must match the host signing tooling
+ * (scripts/sign.ps1: HeaderSize = 0x80) and the linker ASSERT in SBL.ld. */
+#ifndef TOS_IMAGE_HEADER_SIZE
+#define TOS_IMAGE_HEADER_SIZE 0x80U
+#endif
 
 /* The host signing step replaces this section in exported ELF and BIN files. */
 __attribute__((section(".tos_image_header"), used, aligned(4)))

@@ -27,6 +27,7 @@
 #include "tos_secure_boot_key.h"
 #include "sha256.h"
 
+#if TOS_SECURE_BOOT_VERIFY_ENABLED
 static const uint8_t root_public_key[64] = TOS_SECURE_BOOT_PUBLIC_KEY_BYTES;
 static const uint8_t erased_header[TOS_IMAGE_HEADER_SIZE] = {
     [0 ... TOS_IMAGE_HEADER_SIZE - 1] = 0xFFU,
@@ -75,12 +76,21 @@ static void hash_signature_input(const TosImageHeader_t *header,
   TosSha256Update(&sha, header->image_digest, sizeof(header->image_digest));
   TosSha256Final(&sha, digest);
 }
+#endif
 
 SecureBoot_Result_t SecureBoot_Verify(uint32_t storage_address,
                                     uint32_t expected_load_address,
                                     uint32_t expected_size,
                                     uint32_t expected_type,
                                     uint32_t minimum_version) {
+#if !TOS_SECURE_BOOT_VERIFY_ENABLED
+  (void)storage_address;
+  (void)expected_load_address;
+  (void)expected_size;
+  (void)expected_type;
+  (void)minimum_version;
+  return SECUREBOOT_VERIFY_OK;
+#else
   const TosImageHeader_t *header;
   uint8_t image_digest[32];
   uint8_t signature_digest[32];
@@ -111,12 +121,21 @@ SecureBoot_Result_t SecureBoot_Verify(uint32_t storage_address,
     return SECUREBOOT_VERIFY_BAD_SIGNATURE;
   }
   return SECUREBOOT_VERIFY_OK;
+#endif
 }
 
 SecureBoot_Result_t SecureBoot_VerifyHeaderAndHash(
     uint32_t storage_address, uint32_t expected_load_address,
     uint32_t expected_size, uint32_t expected_type,
     uint32_t minimum_version) {
+#if !TOS_SECURE_BOOT_VERIFY_ENABLED
+  (void)storage_address;
+  (void)expected_load_address;
+  (void)expected_size;
+  (void)expected_type;
+  (void)minimum_version;
+  return SECUREBOOT_VERIFY_OK;
+#else
   const TosImageHeader_t *header;
   uint8_t image_digest[32];
   if (expected_size < TOS_IMAGE_HEADER_OFFSET + TOS_IMAGE_HEADER_SIZE ||
@@ -142,4 +161,5 @@ SecureBoot_Result_t SecureBoot_VerifyHeaderAndHash(
   if (!equal32(image_digest, header->image_digest))
     return SECUREBOOT_VERIFY_BAD_DIGEST;
   return SECUREBOOT_VERIFY_OK;
+#endif
 }

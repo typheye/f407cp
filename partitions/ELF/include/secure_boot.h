@@ -27,6 +27,11 @@
 
 #include "tee_format.h"
 
+/* Temporary development switch. Set to 1 before production builds. */
+#ifndef TOS_SECURE_BOOT_VERIFY_ENABLED
+#define TOS_SECURE_BOOT_VERIFY_ENABLED 0
+#endif
+
 typedef enum {
   SECUREBOOT_VERIFY_OK = 0,
   SECUREBOOT_VERIFY_BAD_ARGUMENT,

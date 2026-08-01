@@ -44,5 +44,9 @@ private:
 };
 
 extern LED boardLed;
+extern LED redLed;
+extern LED greenLed;
+extern LED blueLed;
+extern LED whiteLed;
 
 #endif

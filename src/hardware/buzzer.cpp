@@ -26,12 +26,6 @@
 Buzzer::Buzzer(GPIO_TypeDef *port, uint16_t pin)
     : _port(port), _pin(pin), _initialized(false) {}
 
-bool Buzzer::isEnabled() {
-
-  return HAL_GPIO_ReadPin(BUZZER_ENABLE_PORT, BUZZER_ENABLE_PIN) ==
-         GPIO_PIN_RESET;
-}
-
 void Buzzer::init() {
   if (_initialized) {
     return;

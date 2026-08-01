@@ -26,21 +26,35 @@
 
 extern "C" {}
 
-extern USART boardSerial;
 extern LED boardLed;
 extern Buzzer buzzer1;
 
-void TOS::init() {
-  SysDram_Init();
-  boardSerial.init();
+void APP::init() {
 
   boardLed.init();
+  redLed.init();
+  greenLed.init();
+  blueLed.init();
+  whiteLed.init();
+
+  key1.init();
+  key2.init();
+  key3.init();
+  key4.init();
 
   buzzer1.init();
   JPDelay(50);
 
+  static uint8_t oledBuffer[LIBOLEDGFX_BUFFER_SIZE];
+  LibOledGfx_DrawCheckerboard8x4(oledBuffer);
+  if (oled.init()) {
+    (void)oled.display(oledBuffer, sizeof(oledBuffer));
+    LOG_I("OLED", "SSD1315 ready at 0x%02X", oled.address());
+  } else {
+    LOG_W("OLED", "SSD1315 not found at 0x3C/0x3D");
+  }
+
   _initialized = true;
 
   LOG_I("MAIN", "System initialized, CPU:168MHz");
-  SysDram_LogStats();
 }

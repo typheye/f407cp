@@ -21,8 +21,6 @@
  */
 
 #include "include/syscalls_override.h"
-#include "core/manager/include/settings_manager.h"
-
 
 extern UART_HandleTypeDef huart1;
 
@@ -56,8 +54,10 @@ static uint32_t debug_uart_timeout_for_len(uint16_t n) {
    * Add margin for HAL overhead. Keep a hard cap so production cannot hang.
    */
   uint32_t t = 6U + ((uint32_t)n + 7U) / 8U;
-  if (t < 12U) t = 12U;
-  if (t > 35U) t = 35U;
+  if (t < 12U)
+    t = 12U;
+  if (t > 35U)
+    t = 35U;
   return t;
 }
 
@@ -67,9 +67,6 @@ int _write(int file, char *ptr, int len) {
     return 0;
   }
 
-  if (!SM_Debug_LogCom()) {
-    return len;
-  }
 
   if (huart1.Instance == NULL || huart1.gState == HAL_UART_STATE_RESET) {
     return len;
@@ -80,12 +77,12 @@ int _write(int file, char *ptr, int len) {
   int sent = 0;
   while (sent < len) {
     uint16_t chunk = (uint16_t)(len - sent);
-    if (chunk > 96U) chunk = 96U;
+    if (chunk > 96U)
+      chunk = 96U;
 
-    HAL_StatusTypeDef st = HAL_UART_Transmit(&huart1,
-                                             (uint8_t *)(ptr + sent),
-                                             chunk,
-                                             debug_uart_timeout_for_len(chunk));
+    HAL_StatusTypeDef st =
+        HAL_UART_Transmit(&huart1, (uint8_t *)(ptr + sent), chunk,
+                          debug_uart_timeout_for_len(chunk));
     if (st != HAL_OK) {
       (void)HAL_UART_AbortTransmit(&huart1);
       debug_uart_recover();

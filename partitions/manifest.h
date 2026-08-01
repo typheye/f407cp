@@ -23,7 +23,6 @@
 #ifndef MANIFEST_H
 #define MANIFEST_H
 
-#include "tee_format.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -50,7 +49,7 @@
  * Upgrade is staged via TMP → ELF copies.
  * LCD splash logo: disable LCD_ENABLED for headless boards.            */
 #ifndef LCD_ENABLED
-#define LCD_ENABLED 1
+#define LCD_ENABLED 0
 #endif
 #define BTN_PORT GPIOA
 #define BTN_PIN 15U

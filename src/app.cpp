@@ -30,6 +30,14 @@ void APP::start() {
     init();
 
   while (1) {
+    if (key1.pressed())
+      redLed.toggle();
+    if (key2.pressed())
+      greenLed.toggle();
+    if (key3.pressed())
+      blueLed.toggle();
+    if (key4.pressed())
+      whiteLed.toggle();
     JPDelay(10);
   }
 }

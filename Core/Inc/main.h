@@ -54,6 +54,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void Tos_Start(void);
+void APP_Start(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

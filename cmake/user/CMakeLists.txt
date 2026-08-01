@@ -5,6 +5,7 @@ set(USER_Include_Dirs
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/manager/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/include/
 )
 
@@ -15,15 +16,19 @@ set(USER_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/init.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/sys/syscalls_override.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/sys/syslog.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/manager/file_manager.c
     
     # 驱动文件
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/led.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/usart.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/buzzer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/button.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/ssd1315.cpp
     
     # Library files
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libdly.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libvan.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/liboledgfx.c
     
 )
 

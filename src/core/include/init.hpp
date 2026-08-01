@@ -24,7 +24,6 @@
 #define INIT_HPP_
 #include "core/include/app.hpp"
 #include "core/sys/include/syslog.h"
-#include "dram.h"
 #include "main.h"
 #include <stdio.h>
 
