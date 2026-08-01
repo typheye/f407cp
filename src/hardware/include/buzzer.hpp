@@ -26,13 +26,9 @@
 #include "include/libdly.h"
 #include "main.h"
 
+#define BUZZER1_PORT GPIOE
+#define BUZZER1_PIN GPIO_PIN_0
 
-#define BUZZER1_PORT GPIOG
-#define BUZZER1_PIN GPIO_PIN_5
-
-
-#define BUZZER_ENABLE_PORT GPIOG
-#define BUZZER_ENABLE_PIN GPIO_PIN_8
 
 class Buzzer {
 public:
@@ -40,15 +36,9 @@ public:
 
   void init();
 
-
-  bool isEnabled();
-
-
   void beep(uint32_t duration_ms);
 
-
   void forceBeep(uint32_t duration_ms);
-
 
   void beepShort() { beep(50); }
   void beepLong() { beep(200); }

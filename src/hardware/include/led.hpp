@@ -26,29 +26,6 @@
 #include "main.h"
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* C-compatible wrappers for cross-language access (e.g. from syshandle.c) */
-void LED_ErrorOn(void);
-void LED_ErrorOff(void);
-void LED_BoardOn(void);
-void LED_BoardOff(void);
-void LED_BoardBlink100ms(void);
-void LED_BoardBlink50ms(void);
-void LED_WarnOn(void);
-void LED_WarnOff(void);
-/* Non-blocking 300ms warning pulse for recoverable network/time failures. */
-void LED_WarnBlink300ms(void);
-void LED_EspCommSuccess(void);
-void LED_EspCommFailure(void);
-void LED_ServiceTick(void);
-
-#ifdef __cplusplus
-}
-#endif
-
 class LED {
 public:
 
@@ -67,7 +44,5 @@ private:
 };
 
 extern LED boardLed;
-extern LED warnLed;
-extern LED errorLed;
 
 #endif

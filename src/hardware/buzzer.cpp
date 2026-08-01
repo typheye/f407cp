@@ -21,13 +21,10 @@
  */
 
 #include "include/buzzer.hpp"
-#include "core/manager/include/settings_manager.h"
 #include "library/include/libdly.h"
-
 
 Buzzer::Buzzer(GPIO_TypeDef *port, uint16_t pin)
     : _port(port), _pin(pin), _initialized(false) {}
-
 
 bool Buzzer::isEnabled() {
 
@@ -40,20 +37,14 @@ void Buzzer::init() {
     return;
   }
 
-
-
   //   HAL_GPIO_WritePin(_port, _pin, GPIO_PIN_RESET);
   _initialized = true;
 
-
-  if (SM_BootGfx() && isEnabled()) {
-    beep(50);
-    JPDelay(100);
-    beep(50);
-    JPDelay(100);
-  }
+  beep(50);
+  JPDelay(100);
+  beep(50);
+  JPDelay(100);
 }
-
 
 void Buzzer::beep(uint32_t duration_ms) {
   if (!_initialized) {
@@ -63,16 +54,10 @@ void Buzzer::beep(uint32_t duration_ms) {
       return;
   }
 
-
-  if (!isEnabled()) {
-    return;
-  }
-
   HAL_GPIO_WritePin(_port, _pin, GPIO_PIN_SET);
   JPDelay(duration_ms);
   HAL_GPIO_WritePin(_port, _pin, GPIO_PIN_RESET);
 }
-
 
 void Buzzer::forceBeep(uint32_t duration_ms) {
   if (!_initialized) {
@@ -85,6 +70,5 @@ void Buzzer::forceBeep(uint32_t duration_ms) {
   JPDelay(duration_ms);
   HAL_GPIO_WritePin(_port, _pin, GPIO_PIN_RESET);
 }
-
 
 Buzzer buzzer1(BUZZER1_PORT, BUZZER1_PIN);

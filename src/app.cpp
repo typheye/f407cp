@@ -1,8 +1,8 @@
 /**
  ******************************************************************************
- * @file    demo_activity.cpp
+ * @file    app.cpp
  * @author  Typheye
- * @brief   Demo Activity implementation.
+ * @brief   App implementation.
  ******************************************************************************
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,41 +20,24 @@
  *
  */
 
-#include "include/demo_activity.hpp"
+#include "core/include/app.hpp"
 #include "library/include/libdly.h"
-#include "library/include/libui.h"
 
+APP::APP() : _initialized(false), _tickCount(0) {}
 
-extern KeyManager keyManager;
-extern LCD boardLCD;
+void APP::start() {
+  if (!_initialized)
+    init();
 
-#define DEMO_ITEMS 8
-static const char *demo_m[DEMO_ITEMS] = {
-    "00 Return",        "01 Key Test",       "03 I2C Scan",
-    "04 JY901S Sensor", "05 BMP180 Sensor",  "07 3D Path Tracer",
-    "09 TCS3472 Test",  "10 SN74HC00N Test",
-};
-static void (*demo_f[DEMO_ITEMS])(void) = {
-    NULL,
-    key_test_activity,
-    i2c_scan_activity,
-    jyro_activity,
-    bmp180_activity,
-    render_3dox_activity_with_exit,
-    tcs3472_activity,
-    hc00n_activity,
-};
-
-// ============ Original TOS-style menu ============
-
-void demo_list_run(void) {
-  static int sel = 0;
   while (1) {
-    sel = UI_MenuLoop("DEMO", demo_m, DEMO_ITEMS, sel);
-    if (sel == 0)
-      return;
-    if (demo_f[sel]) {
-      demo_f[sel]();
-    }
+    JPDelay(10);
   }
+}
+
+APP::~APP() {}
+
+extern "C" void APP_Start(void) {
+  APP os;
+  os.init();
+  os.start();
 }
