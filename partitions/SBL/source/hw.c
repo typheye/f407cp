@@ -70,12 +70,20 @@ SBL_CODE void SBL_LedsOff(void) {
                   RCC_AHB1ENR_GPIOFEN;
   (void)RCC->AHB1ENR;
 
+  SBL_GpioReset(GPIOF, 6U);
+  SBL_GpioReset(GPIOF, 7U);
+  SBL_GpioReset(GPIOF, 8U);
+  SBL_GpioReset(GPIOF, 9U);
   GPIOC->MODER &= ~(3UL << (13U * 2U));
   GPIOC->MODER |=  (1UL << (13U * 2U));
   GPIOD->MODER &= ~((3UL << (8U * 2U)) | (3UL << (9U * 2U)));
   GPIOD->MODER |=  ((1UL << (8U * 2U)) | (1UL << (9U * 2U)));
-  GPIOF->MODER &= ~(3UL << (10U * 2U));
-  GPIOF->MODER |=  (1UL << (10U * 2U));
+  GPIOF->MODER &= ~((3UL << (6U * 2U)) | (3UL << (7U * 2U)) |
+                    (3UL << (8U * 2U)) | (3UL << (9U * 2U)) |
+                    (3UL << (10U * 2U)));
+  GPIOF->MODER |=  ((1UL << (6U * 2U)) | (1UL << (7U * 2U)) |
+                    (1UL << (8U * 2U)) | (1UL << (9U * 2U)) |
+                    (1UL << (10U * 2U)));
 
   SBL_GpioSet(GPIOC, 13U);
   SBL_GpioReset(GPIOD, 8U);

@@ -46,10 +46,19 @@ void APP::init() {
   JPDelay(50);
 
   static uint8_t oledBuffer[LIBOLEDGFX_BUFFER_SIZE];
-  LibOledGfx_DrawCheckerboard8x4(oledBuffer);
   if (oled.init()) {
-    (void)oled.display(oledBuffer, sizeof(oledBuffer));
-    LOG_I("OLED", "SSD1315 ready at 0x%02X", oled.address());
+    LibOledGfx_Clear(oledBuffer, 0U);
+    bool frameReady = oled.display(oledBuffer, sizeof(oledBuffer));
+    if (frameReady) {
+      LibOledGfx_DrawCheckerboard8x4(oledBuffer);
+      frameReady = oled.display(oledBuffer, sizeof(oledBuffer));
+    }
+    if (frameReady && oled.setDisplayOn(true)) {
+      LOG_I("OLED", "SSD1315 ready at 0x%02X", oled.address());
+    } else {
+      (void)oled.setDisplayOn(false);
+      LOG_W("OLED", "SSD1315 frame initialization failed");
+    }
   } else {
     LOG_W("OLED", "SSD1315 not found at 0x3C/0x3D");
   }

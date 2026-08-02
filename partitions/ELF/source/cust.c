@@ -42,10 +42,17 @@ void Cust_Setup(void) {
   GPIOD->MODER |=  ((1UL << (14U * 2U)) | (1UL << (13U * 2U)));
   GPIOD->BSRR = (1UL << 14U) | (1UL << (13U + 16U));
 
-  /* PF10 out low */
-  GPIOF->MODER &= ~(3UL << (10U * 2U));
-  GPIOF->MODER |=  (1UL << (10U * 2U));
-  GPIOF->BSRR = (1UL << (10U + 16U));
+  /* Keep the four LEDs and PF10 low before switching them to outputs. */
+  GPIOF->BSRR = ((1UL << 6U) | (1UL << 7U) | (1UL << 8U) |
+                 (1UL << 9U) | (1UL << 10U)) << 16U;
+  GPIOF->OTYPER &= ~((1UL << 6U) | (1UL << 7U) | (1UL << 8U) |
+                     (1UL << 9U) | (1UL << 10U));
+  GPIOF->MODER &= ~((3UL << (6U * 2U)) | (3UL << (7U * 2U)) |
+                    (3UL << (8U * 2U)) | (3UL << (9U * 2U)) |
+                    (3UL << (10U * 2U)));
+  GPIOF->MODER |=  ((1UL << (6U * 2U)) | (1UL << (7U * 2U)) |
+                    (1UL << (8U * 2U)) | (1UL << (9U * 2U)) |
+                    (1UL << (10U * 2U)));
 }
 
 void Cust_Init(void)   { /* reserved */ }

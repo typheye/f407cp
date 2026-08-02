@@ -27,7 +27,7 @@ bool SSD1315::init() {
       0xAEU, 0xD5U, 0x80U, 0xA8U, 0x3FU, 0xD3U, 0x00U, 0x40U,
       0x8DU, 0x14U, 0x20U, 0x00U, 0xA1U, 0xC8U, 0xDAU, 0x12U,
       0x81U, 0x7FU, 0xD9U, 0xF1U, 0xDBU, 0x40U, 0xA4U, 0xA6U,
-      0x2EU, 0xAFU,
+      0x2EU,
   };
 
   _ready = false;
@@ -63,6 +63,13 @@ bool SSD1315::display(const uint8_t *buffer, std::size_t size) {
       return false;
   }
   return true;
+}
+
+bool SSD1315::setDisplayOn(bool enabled) {
+  if (!_ready)
+    return false;
+  const uint8_t command = enabled ? 0xAFU : 0xAEU;
+  return sendCommands(&command, 1U);
 }
 
 SSD1315 oled(&hi2c1);

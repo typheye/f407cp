@@ -11,6 +11,7 @@ public:
 
   bool init();
   bool display(const uint8_t *buffer, std::size_t size);
+  bool setDisplayOn(bool enabled);
   bool ready() const { return _ready; }
   uint8_t address() const { return _address; }
 
