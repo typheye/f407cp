@@ -32,7 +32,7 @@
  * ====================================================================== */
 
 /* ── Bootloader versions (reported by fastboot getvar) ────────────── */
-#define TOS_PRODUCT_NAME "CNAEK7"
+#define TOS_PRODUCT_NAME "CNAHA1"
 #define TOS_VERSION ""
 #define TOS_BL_VERSION "TOSV3.2"
 #define TOS_BB_VERSION "N/A" /* baseband */
@@ -49,7 +49,7 @@
  * Upgrade is staged via TMP → ELF copies.
  * LCD splash logo: disable LCD_ENABLED for headless boards.            */
 #ifndef LCD_ENABLED
-#define LCD_ENABLED 0
+#define LCD_ENABLED 1
 #endif
 #define BTN_PORT GPIOA
 #define BTN_PIN 15U
