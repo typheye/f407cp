@@ -24,7 +24,6 @@
 #include "i2c.h"
 #include "rtc.h"
 #include "sdio.h"
-#include "spi.h"
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
@@ -128,7 +127,6 @@ int main(void)
   MX_FATFS_Init();
   MX_USB_DEVICE_Init();
   MX_RTC_Init();
-  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   APP_Start();
   /* USER CODE END 2 */
