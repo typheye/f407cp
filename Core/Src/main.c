@@ -24,6 +24,8 @@
 #include "i2c.h"
 #include "rtc.h"
 #include "sdio.h"
+#include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
@@ -53,8 +55,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t esp8266_rx_byte = 0;
-extern volatile uint32_t uart2_rx_count;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -127,6 +127,8 @@ int main(void)
   MX_FATFS_Init();
   MX_USB_DEVICE_Init();
   MX_RTC_Init();
+  MX_SPI1_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   APP_Start();
   /* USER CODE END 2 */

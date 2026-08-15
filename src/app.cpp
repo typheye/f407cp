@@ -21,8 +21,8 @@
  */
 
 #include "core/include/app.hpp"
+#include "core/sys/include/syswatchdog.h"
 #include "library/include/libdly.h"
-
 APP::APP() : _initialized(false), _tickCount(0) {}
 
 void APP::start() {
@@ -30,15 +30,11 @@ void APP::start() {
     init();
 
   while (1) {
-    if (key1.pressed())
-      redLed.toggle();
-    if (key2.pressed())
-      greenLed.toggle();
-    if (key3.pressed())
-      blueLed.toggle();
-    if (key4.pressed())
-      whiteLed.toggle();
-    JPDelay(10);
+    SysUI::loop();
+    CDC_Bridge_Tick();
+    SysWatchdog_Tick();
+    SecondaryClock_Tick();
+    JPDelay(2U);
   }
 }
 

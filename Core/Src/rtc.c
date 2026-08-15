@@ -56,7 +56,7 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
-
+  rtcConfigured = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0);
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date

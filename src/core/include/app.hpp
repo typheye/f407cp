@@ -24,12 +24,15 @@
 #define APP_HPP
 
 // ── Hardware headers ──────────────────────────────────────────
-#include "include/buzzer.hpp"
-#include "include/button.hpp"
-#include "include/led.hpp"
-#include "include/ssd1315.hpp"
-#include "include/liboledgfx.h"
-#include "include/libvan.h"
+#include "hardware/include/buzzer.hpp"
+#include "hardware/include/cdc_bridge.h"
+#include "hardware/include/key.hpp"
+#include "hardware/include/lcd.hpp"
+#include "hardware/include/led.hpp"
+#include "hardware/include/ssd1315.hpp"
+#include "hardware/include/secondary_clock.hpp"
+#include "library/include/liboledgfx.h"
+#include "gui/include/sysui.hpp"
 
 #include "main.h"
 #include "stm32f4xx_hal.h"

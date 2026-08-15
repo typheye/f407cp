@@ -21,6 +21,7 @@
  */
 
 #include "include/syscalls_override.h"
+#include "usbd_cdc_if.h"
 
 extern UART_HandleTypeDef huart1;
 
@@ -88,6 +89,7 @@ int _write(int file, char *ptr, int len) {
       debug_uart_recover();
       break;
     }
+    (void)CDC_Transmit_FS((uint8_t *)(ptr + sent), chunk);
     sent += chunk;
   }
 

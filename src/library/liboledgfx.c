@@ -1,6 +1,7 @@
 #include "include/liboledgfx.h"
 
 #include <string.h>
+#include <stdio.h>
 
 void LibOledGfx_Clear(uint8_t *buffer, uint8_t color) {
   if (buffer == 0)
@@ -41,4 +42,102 @@ void LibOledGfx_DrawCheckerboard8x4(uint8_t *buffer) {
                          (uint8_t)((row + column) & 1U));
     }
   }
+}
+
+static const uint8_t *glyph5x7(char ch) {
+  static const uint8_t blank[5] = {0, 0, 0, 0, 0};
+  static const uint8_t dash[5] = {0x08, 0x08, 0x08, 0x08, 0x08};
+  static const uint8_t colon[5] = {0, 0x36, 0x36, 0, 0};
+  static const uint8_t digits[10][5] = {
+      {0x3E,0x51,0x49,0x45,0x3E}, {0x00,0x42,0x7F,0x40,0x00},
+      {0x42,0x61,0x51,0x49,0x46}, {0x21,0x41,0x45,0x4B,0x31},
+      {0x18,0x14,0x12,0x7F,0x10}, {0x27,0x45,0x45,0x45,0x39},
+      {0x3C,0x4A,0x49,0x49,0x30}, {0x01,0x71,0x09,0x05,0x03},
+      {0x36,0x49,0x49,0x49,0x36}, {0x06,0x49,0x49,0x29,0x1E}};
+  static const uint8_t letters[26][5] = {
+      {0x7E,0x11,0x11,0x11,0x7E}, {0x7F,0x49,0x49,0x49,0x36},
+      {0x3E,0x41,0x41,0x41,0x22}, {0x7F,0x41,0x41,0x22,0x1C},
+      {0x7F,0x49,0x49,0x49,0x41}, {0x7F,0x09,0x09,0x09,0x01},
+      {0x3E,0x41,0x49,0x49,0x7A}, {0x7F,0x08,0x08,0x08,0x7F},
+      {0x00,0x41,0x7F,0x41,0x00}, {0x20,0x40,0x41,0x3F,0x01},
+      {0x7F,0x08,0x14,0x22,0x41}, {0x7F,0x40,0x40,0x40,0x40},
+      {0x7F,0x02,0x0C,0x02,0x7F}, {0x7F,0x04,0x08,0x10,0x7F},
+      {0x3E,0x41,0x41,0x41,0x3E}, {0x7F,0x09,0x09,0x09,0x06},
+      {0x3E,0x41,0x51,0x21,0x5E}, {0x7F,0x09,0x19,0x29,0x46},
+      {0x46,0x49,0x49,0x49,0x31}, {0x01,0x01,0x7F,0x01,0x01},
+      {0x3F,0x40,0x40,0x40,0x3F}, {0x1F,0x20,0x40,0x20,0x1F},
+      {0x7F,0x20,0x18,0x20,0x7F}, {0x63,0x14,0x08,0x14,0x63},
+      {0x07,0x08,0x70,0x08,0x07}, {0x61,0x51,0x49,0x45,0x43}};
+  if (ch >= '0' && ch <= '9') return digits[ch - '0'];
+  if (ch >= 'a' && ch <= 'z') ch = (char)(ch - 'a' + 'A');
+  if (ch >= 'A' && ch <= 'Z') return letters[ch - 'A'];
+  if (ch == '-') return dash;
+  if (ch == ':') return colon;
+  return blank;
+}
+
+void LibOledGfx_DrawText5x7(uint8_t *buffer, uint8_t x, uint8_t y,
+                           const char *text) {
+  if (buffer == 0 || text == 0) return;
+  while (*text != '\0' && x < LIBOLEDGFX_WIDTH) {
+    const uint8_t *glyph = glyph5x7(*text++);
+    for (uint8_t gx = 0U; gx < 5U; ++gx) {
+      for (uint8_t gy = 0U; gy < 7U; ++gy) {
+        if ((glyph[gx] & (1U << gy)) != 0U)
+          LibOledGfx_FillRect(buffer, (uint8_t)(x + gx), (uint8_t)(y + gy),
+                              1U, 1U, 1U);
+      }
+    }
+    x = (uint8_t)(x + 6U);
+  }
+}
+
+static void drawSegment(uint8_t *buffer, uint8_t x, uint8_t y,
+                        uint8_t segment) {
+  const uint8_t t = 2U;
+  if (segment == 0U) LibOledGfx_FillRect(buffer, x + t, y, 10U, t, 1U);
+  if (segment == 1U) LibOledGfx_FillRect(buffer, x + 12U, y + t, t, 11U, 1U);
+  if (segment == 2U) LibOledGfx_FillRect(buffer, x + 12U, y + 15U, t, 11U, 1U);
+  if (segment == 3U) LibOledGfx_FillRect(buffer, x + t, y + 26U, 10U, t, 1U);
+  if (segment == 4U) LibOledGfx_FillRect(buffer, x, y + 15U, t, 11U, 1U);
+  if (segment == 5U) LibOledGfx_FillRect(buffer, x, y + t, t, 11U, 1U);
+  if (segment == 6U) LibOledGfx_FillRect(buffer, x + t, y + 13U, 10U, t, 1U);
+}
+
+static void drawDigit(uint8_t *buffer, uint8_t x, uint8_t y, uint8_t digit) {
+  static const uint8_t masks[10] = {
+      0x3FU, 0x06U, 0x5BU, 0x4FU, 0x66U,
+      0x6DU, 0x7DU, 0x07U, 0x7FU, 0x6FU};
+  if (digit > 9U) return;
+  for (uint8_t segment = 0U; segment < 7U; ++segment)
+    if ((masks[digit] & (1U << segment)) != 0U)
+      drawSegment(buffer, x, y, segment);
+}
+
+void LibOledGfx_DrawDigitalClock(uint8_t *buffer, uint16_t year,
+                                uint8_t month, uint8_t day,
+                                const char *weekday, uint8_t hour,
+                                uint8_t minute, uint8_t second) {
+  char date[16];
+  LibOledGfx_Clear(buffer, 0U);
+  snprintf(date, sizeof(date), "%04u-%02u-%02u", year, month, day);
+  LibOledGfx_DrawText5x7(buffer, 0U, 0U, date);
+  if (weekday != 0) {
+    size_t length = strlen(weekday);
+    uint8_t x = length * 6U < 68U ? (uint8_t)(128U - length * 6U) : 68U;
+    LibOledGfx_DrawText5x7(buffer, x, 0U, weekday);
+  }
+  LibOledGfx_FillRect(buffer, 0U, 10U, 128U, 1U, 1U);
+
+  const uint8_t values[6] = {hour / 10U, hour % 10U, minute / 10U,
+                             minute % 10U, second / 10U, second % 10U};
+  const uint8_t positions[6] = {1U, 19U, 43U, 61U, 85U, 103U};
+  for (uint8_t i = 0U; i < 6U; ++i)
+    drawDigit(buffer, positions[i], 16U, values[i]);
+  LibOledGfx_FillRect(buffer, 37U, 23U, 3U, 3U, 1U);
+  LibOledGfx_FillRect(buffer, 37U, 36U, 3U, 3U, 1U);
+  LibOledGfx_FillRect(buffer, 79U, 23U, 3U, 3U, 1U);
+  LibOledGfx_FillRect(buffer, 79U, 36U, 3U, 3U, 1U);
+  LibOledGfx_DrawText5x7(buffer, 37U, 55U, "RTC");
+  LibOledGfx_DrawText5x7(buffer, 74U, 55U, "24H");
 }

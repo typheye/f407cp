@@ -6,7 +6,10 @@ set(USER_Include_Dirs
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/manager/include/
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/sys/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/include/
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/gui/
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/gui/include/
 )
 
 # 列出有需要编译的源文件
@@ -16,19 +19,29 @@ set(USER_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/init.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/sys/syscalls_override.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/sys/syslog.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/sys/sysfonts.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/sys/syswatchdog.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/manager/file_manager.c
     
     # 驱动文件
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/led.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/usart.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/buzzer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/button.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/ssd1315.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/lcd.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/key.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/cdc_bridge.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/secondary_clock.cpp
     
     # Library files
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libdly.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libvan.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/liboledgfx.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libpd.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libui.cpp
+
+    # Hardware-adapted TOS GUI
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/gui/sysui.cpp
     
 )
 

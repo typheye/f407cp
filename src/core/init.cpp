@@ -21,8 +21,15 @@
  */
 
 #include "include/init.hpp"
+#include "core/sys/include/syswatchdog.h"
+#include "gui/include/sysui.hpp"
+#include "hardware/include/cdc_bridge.h"
+#include "hardware/include/key.hpp"
+#include "hardware/include/lcd.hpp"
+#include "hardware/include/secondary_clock.hpp"
 #include "library/include/libdly.h"
 #include "manifest.h"
+#include "rtc.h"
 
 extern "C" {}
 
@@ -37,33 +44,21 @@ void APP::init() {
   blueLed.init();
   whiteLed.init();
 
-  key1.init();
-  key2.init();
-  key3.init();
-  key4.init();
+  keyManager.init();
 
   buzzer1.init();
   JPDelay(50);
 
-  static uint8_t oledBuffer[LIBOLEDGFX_BUFFER_SIZE];
-  if (oled.init()) {
-    LibOledGfx_Clear(oledBuffer, 0U);
-    bool frameReady = oled.display(oledBuffer, sizeof(oledBuffer));
-    if (frameReady) {
-      LibOledGfx_DrawCheckerboard8x4(oledBuffer);
-      frameReady = oled.display(oledBuffer, sizeof(oledBuffer));
-    }
-    if (frameReady && oled.setDisplayOn(true)) {
-      LOG_I("OLED", "SSD1315 ready at 0x%02X", oled.address());
-    } else {
-      (void)oled.setDisplayOn(false);
-      LOG_W("OLED", "SSD1315 frame initialization failed");
-    }
-  } else {
-    LOG_W("OLED", "SSD1315 not found at 0x3C/0x3D");
-  }
+  SysWatchdog_Init();
+  boardLCD.init();
+  SysUI::init();
+  CDC_Bridge_Start();
 
   _initialized = true;
+
+  /* ELF left the secondary panel off and cleared. Enable it only after the
+   * complete SYSTEM UI and transport stack are ready. */
+  SecondaryClock_Init();
 
   LOG_I("MAIN", "System initialized, CPU:168MHz");
 }

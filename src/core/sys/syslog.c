@@ -23,14 +23,6 @@
 #include "include/syslog.h"
 #include "file_manager.h"
 
-extern int ESP8266_GetState(void);
-extern bool ESP8266_IsHardDisabled(void);
-extern bool TSDIO_IsHardDisabled(void);
-extern bool TSDIO_IsInitialized(void);
-extern volatile uint32_t uart2_rx_count;
-extern uint32_t SysHandle_CodeFromFResult(FRESULT res, uint32_t fallback);
-extern void SysHandle_ExceptionNoDump(uint32_t code);
-extern bool SysHandle_IsInException(void);
 extern RTC_HandleTypeDef hrtc;
 
 static uint8_t g_syslog_file_guard = 0;
@@ -211,10 +203,6 @@ void SysLog_WriteFatalDump(uint32_t code, const char *name) {
   RTC_DateTypeDef d;
   char rtc_line[48];
   char extra[256];
-  int esp_state = ESP8266_GetState();
-  bool esp_disabled = ESP8266_IsHardDisabled();
-  bool sdio_disabled = TSDIO_IsHardDisabled();
-  bool sdio_ready = TSDIO_IsInitialized();
 
   strcpy(rtc_line, "rtc=unknown\r\n");
   if (hrtc.Instance == RTC) {
@@ -229,14 +217,9 @@ void SysLog_WriteFatalDump(uint32_t code, const char *name) {
   snprintf(extra, sizeof(extra),
            "tick_ms=%lu\r\n"
            "%s"
-           "esp_state=%d\r\n"
-           "esp_hard_disabled=%u\r\n"
-           "esp_uart_rx_count=%lu\r\n"
-           "sdio_initialized=%u\r\n"
-           "sdio_hard_disabled=%u\r\n",
-           (unsigned long)HAL_GetTick(), rtc_line, esp_state,
-           esp_disabled ? 1U : 0U, (unsigned long)uart2_rx_count,
-           sdio_ready ? 1U : 0U, sdio_disabled ? 1U : 0U);
+           "network_transport=usb_cdc\r\n"
+           "external_network_module=none\r\n",
+           (unsigned long)HAL_GetTick(), rtc_line);
 
   (void)FMCore_WriteSystemDump(code, name, extra);
 }
