@@ -42,14 +42,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-static uint8_t esp8266_line_buffer[256];
-static uint16_t esp8266_line_index = 0;
 
-uint8_t esp8266_global_buffer[2048];
-uint16_t esp8266_global_index = 0;
-uint8_t esp8266_data_ready = 0;
-
-volatile uint32_t uart2_rx_count = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -59,13 +52,7 @@ volatile uint32_t uart2_rx_count = 0;
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void append_to_global_buffer(uint8_t data) {
-  if (esp8266_global_index < sizeof(esp8266_global_buffer) - 1) {
-    esp8266_global_buffer[esp8266_global_index++] = data;
-    esp8266_global_buffer[esp8266_global_index] = '\0';
-    esp8266_data_ready = 1;
-  }
-}
+
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
