@@ -22,6 +22,7 @@
 
 #include "include/libdly.h"
 
+extern void TosApi_Tick(void) __attribute__((weak));
 
 #ifdef USE_SYSTEM_TICK
 static volatile uint32_t system_tick = 0;
@@ -30,6 +31,7 @@ void SysTick_Handler(void) { system_tick++; }
 #endif
 
 static volatile uint32_t delay_idle_ms = 0;
+static volatile uint8_t delay_tick_guard = 0U;
 
 static void delay_add_idle_ms(uint32_t ms) {
   if (ms == 0U) {
@@ -43,7 +45,14 @@ static void delay_add_idle_ms(uint32_t ms) {
 
 void JPDelay(uint32_t ms) {
   uint32_t start = HAL_GetTick();
-  HAL_Delay(ms);
+  while ((uint32_t)(HAL_GetTick() - start) < ms) {
+    HAL_Delay(1U);
+    if (TosApi_Tick && delay_tick_guard == 0U) {
+      delay_tick_guard = 1U;
+      TosApi_Tick();
+      delay_tick_guard = 0U;
+    }
+  }
   uint32_t elapsed = HAL_GetTick() - start;
   delay_add_idle_ms(elapsed);
 }

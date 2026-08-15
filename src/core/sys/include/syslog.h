@@ -56,7 +56,7 @@ typedef enum {
 /* ========== Recommended module tags (5 chars max, passed as string literal) ==========
  * MAIN  – main / TOS init           FLASH – sfhd Flash driver
  * SMGR  – settings manager          RTC   – real-time clock
- * SDIO  – SD card driver            ESP   – ESP8266 WiFi
+ * SDIO  – SD card driver            NET   – network stack
  * LCD   – display driver            TCS   – TCS3472 color sensor
  * BMP   – BMP180 pressure           JYRO  – JY901S gyro
  * POT   – potentiometer             HC00  – SN74HC00N logic
@@ -72,7 +72,7 @@ typedef enum {
  * BACT  – BMP180 activity           HACT  – HC00N activity
  * DACT  – display demo              PACT  – potentiometer activity
  * SDAC  – SD card activity          KACT  – key test activity
- * EACT  – ESP8266 activity          3DOX  – 3D demo
+ * EACT  – network activity          3DOX  – 3D demo
  */
 
 /* ========== ANSI color codes ========== */

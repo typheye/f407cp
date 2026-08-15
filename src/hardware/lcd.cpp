@@ -1,6 +1,8 @@
 #include "include/lcd.hpp"
 
 #include "library/include/libpd.h"
+#include "library/include/libemo.h"
+#include "library/include/libdly.h"
 #include "rtc.h"
 
 namespace {
@@ -25,7 +27,8 @@ void configureControlPins() {
 LCD boardLCD;
 
 LCD::LCD()
-    : _initialized(false), _brightness(kDefaultBrightness), _tileY(0U),
+    : _initialized(false), _autoBrightness(false), _rotation(0U),
+      _brightness(kDefaultBrightness), _tileY(0U),
       _tileH(TILE_HEIGHT) {}
 
 uint16_t LCD::rgb888ToRgb565(uint32_t color) const {
@@ -73,15 +76,37 @@ void LCD::setAddress(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
 void LCD::init() {
   configureControlPins();
 
-  /* SBL already initialized the controller. Reassert only the format and the
-   * known-good native CW mode; the software window transform supplies the
-   * project's logical CCW orientation without the panel offset bug. */
+  /* Keep the SBL framebuffer/logo handoff: do not hardware-reset or clear the
+   * panel here. Reapply the complete TOS ST7789 setup sequence, while using
+   * the tested native CW MADCTL plus software window transform. */
   writeCommand(0x3AU);
   writeData8(0x55U);
   writeCommand(0x36U);
   writeData8(0x60U);
+  writeCommand(0xB2U);
+  const uint8_t porch[] = {0x0CU, 0x0CU, 0x00U, 0x33U, 0x33U};
+  writeData(porch, sizeof(porch));
+  writeCommand(0xB7U); writeData8(0x35U);
+  writeCommand(0xBBU); writeData8(0x19U);
+  writeCommand(0xC0U); writeData8(0x2CU);
+  writeCommand(0xC2U); writeData8(0x01U);
+  writeCommand(0xC3U); writeData8(0x12U);
+  writeCommand(0xC4U); writeData8(0x20U);
+  writeCommand(0xC6U); writeData8(0x0FU);
+  writeCommand(0xD0U);
+  const uint8_t power[] = {0xA4U, 0xA1U};
+  writeData(power, sizeof(power));
+  writeCommand(0xE0U);
+  const uint8_t gammaP[] = {0xD0U,0x04U,0x0DU,0x11U,0x13U,0x2BU,0x3FU,
+                            0x54U,0x4CU,0x18U,0x0DU,0x0BU,0x1FU,0x23U};
+  writeData(gammaP, sizeof(gammaP));
+  writeCommand(0xE1U);
+  const uint8_t gammaN[] = {0xD0U,0x04U,0x0CU,0x11U,0x13U,0x2CU,0x3FU,
+                            0x44U,0x51U,0x2FU,0x1FU,0x1FU,0x20U,0x23U};
+  writeData(gammaN, sizeof(gammaN));
   writeCommand(0x21U);
   writeCommand(0x29U);
+  JPDelay(100U);
 
   _initialized = true;
   if (HAL_RTCEx_BKUPRead(&hrtc, kBackupMagicRegister) == kBrightnessMagic) {
@@ -115,6 +140,21 @@ void LCD::adjustBrightness(int16_t delta) {
   if (next > 1000)
     next = 1000;
   setBrightness(static_cast<uint16_t>(next));
+}
+
+void LCD::setAutoBrightness(bool enabled) {
+  _autoBrightness = enabled;
+}
+
+void LCD::setRotation(uint8_t rotation) {
+  /* Keep the validated software-compat rotation path. The original native
+   * rotation setting produced panel-window shifts on this board. */
+  _rotation = static_cast<uint8_t>(rotation & 0x01U);
+}
+
+void LCD::updateAutoBrightness() {
+  /* This board uses manual TIM4 backlight control. Keep the upstream launcher
+   * hook callable without changing the user-selected brightness. */
 }
 
 void LCD::fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
@@ -160,11 +200,14 @@ void LCD::beginTileRender(uint16_t y, uint16_t h) {
     y = LCD_HEIGHT - 1U;
   if (h == 0U)
     h = 1U;
+  if (h > TILE_HEIGHT)
+    h = TILE_HEIGHT;
   if (y + h > LCD_HEIGHT)
     h = static_cast<uint16_t>(LCD_HEIGHT - y);
   _tileY = y;
   _tileH = h;
   PD_SetTileWindow(y, h);
+  EMO_SetTileWindow(y, h);
   for (uint32_t i = 0U; i < static_cast<uint32_t>(LCD_WIDTH) * h; ++i)
     tileBuffer[i] = 0U;
 }
@@ -223,7 +266,14 @@ void LCD_ClearFrameBuffer(uint32_t color) {
 void LCD_BeginTileRender(uint16_t y, uint16_t h) { boardLCD.beginTileRender(y, h); }
 void LCD_EndTileRender(void) { boardLCD.endTileRender(); }
 void LCD_FlushTiled(void (*render_cb)(void)) { boardLCD.flushTiled(render_cb); }
-void LCD_UpdateAutoBrightness(void) {}
+void LCD_FlushTiledBlocking(void (*render_cb)(void)) { boardLCD.flushTiled(render_cb); }
+void LCD_EmergencyPrepare(void) {
+  if (boardLCD.getBrightness() < 700U) {
+    boardLCD.setBrightness(700U);
+  }
+}
+void LCD_UpdateAutoBrightness(void) { boardLCD.updateAutoBrightness(); }
+void LCD_SetDebugOverlaySuppressed(uint8_t suppressed) { (void)suppressed; }
 uint16_t LCD_RGB888ToRGB565(uint32_t color) { return boardLCD.rgb888ToRgb565(color); }
 uint16_t LCD_GetWidth(void) { return LCD_WIDTH; }
 uint16_t LCD_GetHeight(void) { return LCD_HEIGHT; }

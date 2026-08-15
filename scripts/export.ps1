@@ -14,6 +14,18 @@ $distDir = Join-Path $root "dist"
 $firmwareDir = Join-Path $distDir "firmware"
 $flashDir = Join-Path $distDir "flash"
 
+function Get-Sha256Hex([string]$LiteralPath) {
+  $stream = [IO.File]::OpenRead($LiteralPath)
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $digest = $sha256.ComputeHash($stream)
+    return ([BitConverter]::ToString($digest)).Replace("-", "")
+  } finally {
+    $sha256.Dispose()
+    $stream.Dispose()
+  }
+}
+
 if (!(Test-Path -LiteralPath $cachePath)) {
   throw "CMake cache not found: $cachePath"
 }
@@ -131,8 +143,8 @@ function Export-Partition {
     & $objcopyPath -O binary --gap-fill 0xFF `
         --pad-to ("0x{0:X8}" -f $padTo) $flashPath $flashVerifyPath
     if ($LASTEXITCODE -ne 0) { throw "ELF expansion failed for $Target" }
-    $signedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
-    $flashHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $flashVerifyPath).Hash
+    $signedHash = Get-Sha256Hex $path
+    $flashHash = Get-Sha256Hex $flashVerifyPath
     $flashLength = (Get-Item -LiteralPath $flashVerifyPath).Length
     Remove-Item -LiteralPath $flashVerifyPath -Force
     if ($flashLength -ne $Size -or $flashHash -ne $signedHash) {

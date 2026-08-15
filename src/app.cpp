@@ -22,7 +22,9 @@
 
 #include "core/include/app.hpp"
 #include "core/sys/include/syswatchdog.h"
+#include "core/sdk/include/tos_api.h"
 #include "library/include/libdly.h"
+
 APP::APP() : _initialized(false), _tickCount(0) {}
 
 void APP::start() {
@@ -30,11 +32,15 @@ void APP::start() {
     init();
 
   while (1) {
-    SysUI::loop();
-    CDC_Bridge_Tick();
+    uint32_t t0 = HAL_GetTick();
     SysWatchdog_Tick();
-    SecondaryClock_Tick();
-    JPDelay(2U);
+    TosApi_Tick();
+    SysUI::loop();
+    uint32_t elapsed = HAL_GetTick() - t0;
+    SysUI::updateCpuUsage(elapsed);
+    TosApi_Tick();
+    SysWatchdog_Tick();
+    JPDelay(10U);
   }
 }
 

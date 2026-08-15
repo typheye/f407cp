@@ -23,11 +23,14 @@
 #include "include/init.hpp"
 #include "core/sys/include/syswatchdog.h"
 #include "gui/include/sysui.hpp"
+#include "core/manager/include/emotion_manager.h"
+#include "core/sdk/include/tos_api.h"
 #include "hardware/include/cdc_bridge.h"
 #include "hardware/include/key.hpp"
 #include "hardware/include/lcd.hpp"
 #include "hardware/include/secondary_clock.hpp"
 #include "library/include/libdly.h"
+#include "library/include/libpd.h"
 #include "manifest.h"
 #include "rtc.h"
 
@@ -43,22 +46,39 @@ void APP::init() {
   greenLed.init();
   blueLed.init();
   whiteLed.init();
-
-  keyManager.init();
+  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9,
+                    GPIO_PIN_SET);
 
   buzzer1.init();
   JPDelay(50);
 
   SysWatchdog_Init();
+  SysWatchdog_FeedNow();
   boardLCD.init();
+  SysWatchdog_FeedNow();
+  JPDelay(50);
+
+  PD_ShowSplashFadeStart(650U);
+
+  keyManager.init();
+
+  EmotionManager_Init();
+  TosApi_Init();
   SysUI::init();
   CDC_Bridge_Start();
 
   _initialized = true;
 
+  LOG_I("MAIN", "System initialized, CPU:168MHz");
+
+  SysWatchdog_FeedNow();
+  JPDelay(250);
+
+  PD_SplashFinish(220U);
+
   /* ELF left the secondary panel off and cleared. Enable it only after the
-   * complete SYSTEM UI and transport stack are ready. */
+   * complete SYSTEM UI and primary display stack are ready. */
   SecondaryClock_Init();
 
-  LOG_I("MAIN", "System initialized, CPU:168MHz");
+  SysUI::setActivity(UI_PET);
 }

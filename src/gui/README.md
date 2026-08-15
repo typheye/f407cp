@@ -11,5 +11,5 @@ Hardware adaptation in this tree:
 - manual TIM4_CH2 backlight control with RTC backup-register persistence;
 - SD, RTC, offline network and watchdog status pages;
 - USB CDC/USART1 bridge in place of HID;
-- no ESP8266, external sensor, collision-switch or physical fault-LED code;
+- no external sensor, collision-switch or physical fault-LED code;
 - SSD1315 remains a secondary RTC clock display.

@@ -1,201 +1,207 @@
+/**
+ ******************************************************************************
+ * @file    sysui.cpp
+ * @author  Typheye
+ * @brief   System UI registry implementation.
+ ******************************************************************************
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "include/sysui.hpp"
-
-#include "core/sys/include/syswatchdog.h"
-#include "fatfs.h"
-#include "hardware/include/key.hpp"
-#include "hardware/include/lcd.hpp"
-#include "hardware/include/cdc_bridge.h"
-#include "hardware/include/secondary_clock.hpp"
+#include "dram.h"
 #include "library/include/libdly.h"
-#include "library/include/libpd.h"
 #include "library/include/libui.h"
-#include "rtc.h"
 
-#include <cstdio>
+extern LCD boardLCD;
+extern TRTC boardTRTC;
+extern KeyManager keyManager;
 
-namespace {
-constexpr int kMenuCount = 6;
-const char *kMenuItems[kMenuCount] = {
-    "00 Status", "01 SD Card", "02 Network", "03 RTC Clock",
-    "04 Display", "05 System",
-};
-int selected;
-uint32_t lastDraw;
+int SysUI::_nowActivity = UI_DASHBOARD;
+uint32_t SysUI::_lastTick = 0;
+void (*SysUI::_currentTestFunc)(void) = nullptr;
+int SysUI::_cpuUsage = 0;
 
-void backgroundTick() {
-  CDC_Bridge_Tick();
-  SecondaryClock_Tick();
-  SysWatchdog_Tick();
+#define TOS_ITEMS 5
+static const char *tos_m[TOS_ITEMS] = {"00 Return", "01 Settings",
+                                       "02 File Manager", "03 HID Tools",
+                                       "04 Demo Activities"};
+
+static uint8_t g_dbg_overlay_enabled = 0;
+static uint32_t g_dbg_frame_count = 0;
+static uint32_t g_dbg_last_sample = 0;
+static uint16_t g_dbg_fps = 0;
+static uint32_t g_dbg_ram_used = 0;
+static uint32_t g_dbg_cram_used = 0;
+static uint8_t g_dbg_ram_pct = 0;
+static uint8_t g_dbg_cram_pct = 0;
+static uint8_t g_dbg_cpu_pct = 0;
+static char g_dbg_line_perf[28] = "FPS:   0F | CPU:   0%";
+static char g_dbg_line_mem[28] = "RAM:   0% | CRM:   0%";
+
+static void debug_format_lines(void) {
+  uint16_t fps = g_dbg_fps > 999U ? 999U : g_dbg_fps;
+  snprintf(g_dbg_line_perf, sizeof(g_dbg_line_perf), "FPS: %3uF | CPU: %3u%%",
+           (unsigned)fps, (unsigned)g_dbg_cpu_pct);
+  snprintf(g_dbg_line_mem, sizeof(g_dbg_line_mem), "RAM: %3u%% | CRM: %3u%%",
+           (unsigned)g_dbg_ram_pct, (unsigned)g_dbg_cram_pct);
 }
 
-void drawLines(const char *title, const char *line1, const char *line2,
-               const char *line3, const char *line4 = nullptr) {
-  LCD_FLUSH({
-    UI_DrawFrameTitle(title);
-    PD_SetFont(FONT_ASCII_16);
-    PD_SetColor(TOS_TEXT);
-    if (line1)
-      PD_DrawString(22, 44, line1);
-    if (line2)
-      PD_DrawString(22, 74, line2);
-    if (line3)
-      PD_DrawString(22, 104, line3);
-    if (line4)
-      PD_DrawString(22, 134, line4);
-    PD_DrawFooterCenter(nullptr, "BACK", nullptr);
-  });
-}
-
-void waitBack() {
-  while (true) {
-    keyManager.tick();
-    if (keyManager.spare.getState() == KEY_PRESSED ||
-        keyManager.confirm.getState() == KEY_PRESSED)
-      return;
-    backgroundTick();
-    JPDelay(2U);
+static void debug_sample_memory(void) {
+  SysDramStats_t ram;
+  SysDramStats_t ccm;
+  if (!SysDram_GetStats(SYSDRAM_REGION_RAM, &ram) ||
+      !SysDram_GetStats(SYSDRAM_REGION_CCM, &ccm)) {
+    g_dbg_ram_used = 0;
+    g_dbg_cram_used = 0;
+    g_dbg_ram_pct = 0;
+    g_dbg_cram_pct = 0;
+    return;
   }
+
+  const uint32_t ram_total = 128U * 1024U;
+  const uint32_t cram_total = 64U * 1024U;
+  uint32_t ram_static = ram_total > ram.total ? ram_total - ram.total : 0U;
+  uint32_t cram_static = cram_total > ccm.total ? cram_total - ccm.total : 0U;
+  g_dbg_ram_used = ram_static + ram.used;
+  g_dbg_cram_used = cram_static + ccm.used;
+  if (g_dbg_ram_used > ram_total)
+    g_dbg_ram_used = ram_total;
+  if (g_dbg_cram_used > cram_total)
+    g_dbg_cram_used = cram_total;
+
+  uint32_t rp = (g_dbg_ram_used * 100U + ram_total / 2U) / ram_total;
+  uint32_t cp = (g_dbg_cram_used * 100U + cram_total / 2U) / cram_total;
+  g_dbg_ram_pct = (uint8_t)(rp > 100U ? 100U : rp);
+  g_dbg_cram_pct = (uint8_t)(cp > 100U ? 100U : cp);
 }
 
-void showStatus() {
-  RTC_TimeTypeDef time{};
-  RTC_DateTypeDef date{};
-  (void)HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
-  (void)HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
-  char clock[32];
-  char brightness[32];
-  snprintf(clock, sizeof(clock), "%04u-%02u-%02u  %02u:%02u:%02u",
-           2000U + date.Year, date.Month, date.Date, time.Hours, time.Minutes,
-           time.Seconds);
-  snprintf(brightness, sizeof(brightness), "Backlight: %u%%",
-           boardLCD.getBrightness() / 10U);
-  drawLines("STATUS", clock, "USB CDC: READY", brightness,
-            SysWatchdog_GetBootText());
-  waitBack();
+extern "C" void SysUI_DebugOverlaySetEnabled(uint8_t enabled) {
+  g_dbg_overlay_enabled = enabled ? 1U : 0U;
+  g_dbg_frame_count = 0;
+  g_dbg_last_sample = HAL_GetTick();
+  g_dbg_fps = 0;
+  g_dbg_cpu_pct = 0;
+  (void)JPDelay_ConsumeIdleMs();
+  debug_sample_memory();
+  debug_format_lines();
 }
 
-void showSd() {
-  FRESULT result = f_mount(&SDFatFS, SDPath, 1U);
-  char state[36];
-  char totalText[36] = "Capacity: unavailable";
-  char freeText[36] = "Free: unavailable";
-  if (result == FR_OK) {
-    DWORD freeClusters = 0U;
-    FATFS *fs = nullptr;
-    result = f_getfree(SDPath, &freeClusters, &fs);
-    if (result == FR_OK && fs != nullptr) {
-      const uint64_t totalKb =
-          ((uint64_t)(fs->n_fatent - 2U) * fs->csize) / 2U;
-      const uint64_t freeKb = ((uint64_t)freeClusters * fs->csize) / 2U;
-      snprintf(totalText, sizeof(totalText), "Capacity: %lu MB",
-               (unsigned long)(totalKb / 1024U));
-      snprintf(freeText, sizeof(freeText), "Free: %lu MB",
-               (unsigned long)(freeKb / 1024U));
+extern "C" uint8_t SysUI_DebugOverlayIsEnabled(void) {
+  return g_dbg_overlay_enabled;
+}
+
+extern "C" void SysUI_DebugOverlayBeginFrame(void) {
+  if (!g_dbg_overlay_enabled) {
+    return;
+  }
+
+  uint32_t now = HAL_GetTick();
+  if (g_dbg_last_sample == 0U) {
+    g_dbg_last_sample = now;
+  }
+  g_dbg_frame_count++;
+  uint32_t dt = now - g_dbg_last_sample;
+  if (dt >= 500U) {
+    uint32_t idle = JPDelay_ConsumeIdleMs();
+    if (idle > dt) {
+      idle = dt;
     }
-  }
-  snprintf(state, sizeof(state), "SD status: %s (%d)",
-           result == FR_OK ? "mounted" : "not ready", (int)result);
-  drawLines("SD CARD", state, totalText, freeText, "Read-only status page");
-  waitBack();
-}
-
-void showNetwork() {
-  drawLines("NETWORK", "Transport: USB CDC", "ESP8266: not installed",
-            "Network stack: offline", "UART1 bridge: enabled");
-  waitBack();
-}
-
-void showClock() {
-  while (true) {
-    RTC_TimeTypeDef time{};
-    RTC_DateTypeDef date{};
-    (void)HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
-    (void)HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
-    char dateText[32];
-    char timeText[32];
-    char weekday[24];
-    static const char *const names[] = {"?", "MONDAY", "TUESDAY", "WEDNESDAY",
-                                        "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"};
-    snprintf(dateText, sizeof(dateText), "Date: %04u-%02u-%02u",
-             2000U + date.Year, date.Month, date.Date);
-    snprintf(timeText, sizeof(timeText), "Time: %02u:%02u:%02u", time.Hours,
-             time.Minutes, time.Seconds);
-    snprintf(weekday, sizeof(weekday), "Weekday: %s",
-             names[date.WeekDay <= 7U ? date.WeekDay : 0U]);
-    drawLines("RTC CLOCK", dateText, weekday, timeText, "Source: LSE / RTC");
-    keyManager.tick();
-    if (keyManager.spare.getState() == KEY_PRESSED ||
-        keyManager.confirm.getState() == KEY_PRESSED)
-      return;
-    backgroundTick();
-    JPDelay(50U);
+    uint32_t busy = dt - idle;
+    uint32_t pct = (busy * 100U + dt / 2U) / dt;
+    g_dbg_cpu_pct = (uint8_t)(pct > 100U ? 100U : pct);
+    g_dbg_fps = (uint16_t)((g_dbg_frame_count * 1000U + dt / 2U) / dt);
+    g_dbg_frame_count = 0;
+    g_dbg_last_sample = now;
+    debug_sample_memory();
+    debug_format_lines();
   }
 }
 
-void showDisplay() {
-  while (true) {
-    char value[32];
-    snprintf(value, sizeof(value), "Brightness: %u%%",
-             boardLCD.getBrightness() / 10U);
-    drawLines("DISPLAY", value, "KEY1: brighter", "KEY2: dimmer",
-              "Manual mode / saved");
-    keyManager.tick();
-    if (keyManager.up.getState() == KEY_PRESSED)
-      boardLCD.adjustBrightness(100);
-    if (keyManager.down.getState() == KEY_PRESSED)
-      boardLCD.adjustBrightness(-100);
-    if (keyManager.spare.getState() == KEY_PRESSED ||
-        keyManager.confirm.getState() == KEY_PRESSED)
-      return;
-    backgroundTick();
-    JPDelay(25U);
+extern "C" void SysUI_DebugOverlayEndFrame(void) {
+  (void)g_dbg_overlay_enabled;
+}
+
+extern "C" void SysUI_DebugOverlayDraw(void) {
+  if (!g_dbg_overlay_enabled) {
+    return;
+  }
+
+  PD_SetFont(FONT_ASCII_12);
+  uint16_t perf_w = PD_GetStringWidth(g_dbg_line_perf);
+  uint16_t mem_w = PD_GetStringWidth(g_dbg_line_mem);
+  int16_t w = (int16_t)((perf_w > mem_w ? perf_w : mem_w) + 8U);
+  const int16_t h = 29;
+  const int16_t x = LCD_WIDTH - w;
+  const int16_t y = LCD_HEIGHT - h;
+
+  PD_FillRect(x, y, w, h, 0x000000);
+
+  PD_SetColor(TOS_GREEN);
+  PD_DrawString(x + 4, y + 2, g_dbg_line_perf);
+
+  PD_SetColor(TOS_YELLOW);
+  PD_DrawString(x + 4, y + 15, g_dbg_line_mem);
+}
+
+void SysUI::init(void) { _lastTick = HAL_GetTick(); }
+
+void SysUI::loop(void) {
+  TosApi_SetPaused(_nowActivity != UI_PET);
+  TosApi_Tick();
+
+  Time_t now;
+  Date_t today;
+  boardTRTC.getDateTime(&now, &today);
+  char time_str[8];
+  SysTime_Fmt(time_str, sizeof(time_str), now.hours, now.minutes);
+  PD_SetHeaderTime(time_str);
+
+  if (_nowActivity == UI_LAUNCHER) {
+    static int sel = 0;
+    sel = UI_MenuLoop("TOS", tos_m, TOS_ITEMS, sel);
+    if (sel == 0) {
+      _nowActivity = UI_PET;
+    } else if (sel == 1) {
+      settings_run();
+    } else if (sel == 2) {
+      file_manager_run();
+    } else if (sel == 3) {
+      hid_tools_run();
+    } else if (sel == 4) {
+      demo_list_run();
+    }
+  } else if (_nowActivity == UI_RUNNING_TEST) {
+    runCurrentTest();
+  } else if (_nowActivity == UI_PET) {
+    petLauncherRun();
+    _nowActivity = UI_LAUNCHER;
+    TosApi_SetPaused(true);
   }
 }
 
-void showSystem() {
-  char code[32];
-  snprintf(code, sizeof(code), "Reset code: %lu",
-           (unsigned long)SysWatchdog_GetBootCode());
-  drawLines("SYSTEM", "Fault LED: disabled", "Text alerts: enabled", code,
-            SysWatchdog_GetBootText());
-  waitBack();
+void SysUI::runCurrentTest(void) {
+  if (_currentTestFunc) {
+    _currentTestFunc();
+  }
+  _nowActivity = UI_LAUNCHER;
+  _currentTestFunc = nullptr;
 }
 
-void openSelected() {
-  switch (selected) {
-  case 0: showStatus(); break;
-  case 1: showSd(); break;
-  case 2: showNetwork(); break;
-  case 3: showClock(); break;
-  case 4: showDisplay(); break;
-  default: showSystem(); break;
-  }
-  lastDraw = 0U;
-}
-} // namespace
-
-void SysUI::init() {
-  selected = 0;
-  lastDraw = 0U;
-  PD_Init();
-}
-
-void SysUI::loop() {
-  backgroundTick();
-  keyManager.tick();
-  if (keyManager.up.getState() == KEY_PRESSED) {
-    selected = (selected - 1 + kMenuCount) % kMenuCount;
-    lastDraw = 0U;
-  }
-  if (keyManager.down.getState() == KEY_PRESSED) {
-    selected = (selected + 1) % kMenuCount;
-    lastDraw = 0U;
-  }
-  if (keyManager.confirm.getState() == KEY_PRESSED)
-    openSelected();
-
-  if ((uint32_t)(HAL_GetTick() - lastDraw) >= 100U) {
-    lastDraw = HAL_GetTick();
-    UI_DrawSimpleMenu("TOS", kMenuItems, kMenuCount, selected);
-  }
-}
+void SysUI::setActivity(int a) { _nowActivity = a; }
+int SysUI::getActivity(void) { return _nowActivity; }
+void SysUI::setCurrentTest(void (*f)(void)) { _currentTestFunc = f; }
+void SysUI::resetMenuPosition(void) {}
+void SysUI::updateCpuUsage(uint32_t w) { _cpuUsage = (int)w; }

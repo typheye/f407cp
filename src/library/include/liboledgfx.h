@@ -21,6 +21,11 @@ void LibOledGfx_DrawDigitalClock(uint8_t *buffer, uint16_t year,
                                 uint8_t month, uint8_t day,
                                 const char *weekday, uint8_t hour,
                                 uint8_t minute, uint8_t second);
+void LibOledGfx_DrawDigitalClockWave(uint8_t *buffer, uint16_t year,
+                                     uint8_t month, uint8_t day,
+                                     const char *weekday, uint8_t hour,
+                                     uint8_t minute, uint8_t second,
+                                     uint8_t wave_phase);
 
 #ifdef __cplusplus
 }

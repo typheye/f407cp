@@ -118,26 +118,45 @@ void LibOledGfx_DrawDigitalClock(uint8_t *buffer, uint16_t year,
                                 uint8_t month, uint8_t day,
                                 const char *weekday, uint8_t hour,
                                 uint8_t minute, uint8_t second) {
-  char date[16];
+  LibOledGfx_DrawDigitalClockWave(buffer, year, month, day, weekday, hour,
+                                  minute, second, 0U);
+}
+
+void LibOledGfx_DrawDigitalClockWave(uint8_t *buffer, uint16_t year,
+                                    uint8_t month, uint8_t day,
+                                    const char *weekday, uint8_t hour,
+                                    uint8_t minute, uint8_t second,
+                                    uint8_t wave_phase) {
+  char date[24];
   LibOledGfx_Clear(buffer, 0U);
-  snprintf(date, sizeof(date), "%04u-%02u-%02u", year, month, day);
-  LibOledGfx_DrawText5x7(buffer, 0U, 0U, date);
-  if (weekday != 0) {
-    size_t length = strlen(weekday);
-    uint8_t x = length * 6U < 68U ? (uint8_t)(128U - length * 6U) : 68U;
-    LibOledGfx_DrawText5x7(buffer, x, 0U, weekday);
-  }
+  snprintf(date, sizeof(date), "%04u-%02u-%02u %s", year, month, day,
+           weekday ? weekday : "");
+  size_t date_len = strlen(date);
+  uint8_t date_x =
+      date_len * 6U < 128U ? (uint8_t)((128U - date_len * 6U) / 2U) : 0U;
+  LibOledGfx_DrawText5x7(buffer, date_x, 0U, date);
   LibOledGfx_FillRect(buffer, 0U, 10U, 128U, 1U, 1U);
 
   const uint8_t values[6] = {hour / 10U, hour % 10U, minute / 10U,
                              minute % 10U, second / 10U, second % 10U};
-  const uint8_t positions[6] = {1U, 19U, 43U, 61U, 85U, 103U};
+  const uint8_t positions[6] = {4U, 22U, 46U, 64U, 88U, 106U};
   for (uint8_t i = 0U; i < 6U; ++i)
     drawDigit(buffer, positions[i], 16U, values[i]);
-  LibOledGfx_FillRect(buffer, 37U, 23U, 3U, 3U, 1U);
-  LibOledGfx_FillRect(buffer, 37U, 36U, 3U, 3U, 1U);
-  LibOledGfx_FillRect(buffer, 79U, 23U, 3U, 3U, 1U);
-  LibOledGfx_FillRect(buffer, 79U, 36U, 3U, 3U, 1U);
-  LibOledGfx_DrawText5x7(buffer, 37U, 55U, "RTC");
-  LibOledGfx_DrawText5x7(buffer, 74U, 55U, "24H");
+  LibOledGfx_FillRect(buffer, 41U, 23U, 3U, 3U, 1U);
+  LibOledGfx_FillRect(buffer, 41U, 36U, 3U, 3U, 1U);
+  LibOledGfx_FillRect(buffer, 83U, 23U, 3U, 3U, 1U);
+  LibOledGfx_FillRect(buffer, 83U, 36U, 3U, 3U, 1U);
+
+  static const int8_t wave[16] = {0, 1, 2, 2, 3, 2, 2, 1,
+                                  0, -1, -2, -2, -3, -2, -2, -1};
+  for (uint8_t x = 0U; x < LIBOLEDGFX_WIDTH; x += 2U) {
+    uint8_t idx = (uint8_t)((x / 2U + wave_phase) & 0x0FU);
+    int16_t y = (int16_t)59 + wave[idx];
+    if (y < 54) y = 54;
+    if (y > 63) y = 63;
+    LibOledGfx_FillRect(buffer, x, (uint8_t)y, 2U, 1U, 1U);
+    if ((x & 0x06U) == 0U && y + 1 <= 63) {
+      LibOledGfx_FillRect(buffer, x, (uint8_t)(y + 1), 2U, 1U, 1U);
+    }
+  }
 }

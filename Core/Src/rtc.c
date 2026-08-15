@@ -38,7 +38,7 @@ void MX_RTC_Init(void)
   RTC_DateTypeDef sDate = {0};
 
   /* USER CODE BEGIN RTC_Init 1 */
-
+  uint32_t rtcConfigured = 0U;
   /* USER CODE END RTC_Init 1 */
 
   /** Initialize RTC Only
@@ -57,6 +57,7 @@ void MX_RTC_Init(void)
 
   /* USER CODE BEGIN Check_RTC_BKUP */
   rtcConfigured = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0);
+  if (rtcConfigured != 0x544F5301U) {
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date
@@ -80,7 +81,8 @@ void MX_RTC_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN RTC_Init 2 */
-
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, 0x544F5301U);
+  }
   /* USER CODE END RTC_Init 2 */
 
 }

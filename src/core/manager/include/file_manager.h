@@ -2,7 +2,7 @@
  ******************************************************************************
  * @file    file_manager.h
  * @author  Typheye
- * @brief   SD card file manager interface (boot log / system dump).
+ * @brief   File Manager interface.
  ******************************************************************************
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,26 +23,61 @@
 #ifndef FILE_MANAGER_H
 #define FILE_MANAGER_H
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "ff.h"
+#include "core/include/syshandle.h"
+#include "core/sys/include/syslog.h"
+#include "core/sys/include/syswatchdog.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * @brief  Append one formatted log line to the SD boot log.
- * @param  line  NUL-terminated log line (CRLF already appended by caller)
- * @param  len   Byte length of @p line
- * @retval FRESULT; FR_NOT_READY / FR_NO_FILESYSTEM while the SD card is not
- *         ready so early-boot messages are silently retried by the caller.
- */
-FRESULT FMCore_AppendBootLog(const char *line, uint32_t len);
+#define FMCORE_PATH_MAX 192U
+#define FMCORE_NAME_MAX 64U
 
-/**
- * @brief  Write a fatal system dump record to the SD card.
- */
+typedef struct {
+  char name[FMCORE_NAME_MAX];
+  uint8_t is_dir;
+  uint32_t size;
+  uint8_t attr;
+} FMCore_Entry;
+
+FRESULT FMCore_Mount(FATFS *fs, bool fatal_on_storage_error);
+FRESULT FMCore_MountInternal(void);
+FRESULT FMCore_MountStorage(FATFS *fs, bool log_result);
+void FMCore_Unmount(void);
+bool FMCore_IsStorageMounted(void);
+FRESULT FMCore_Stat(const char *path, FILINFO *info, bool fatal_on_storage_error);
+FRESULT FMCore_ListDir(const char *path, FMCore_Entry *entries, uint16_t max_entries,
+                       uint16_t *out_count, bool fatal_on_storage_error);
+FRESULT FMCore_CreateDir(const char *path, bool fatal_on_storage_error);
+FRESULT FMCore_CreateFile(const char *path, const void *data, uint32_t len,
+                          bool fatal_on_storage_error);
+FRESULT FMCore_WriteFile(const char *path, const void *data, uint32_t len,
+                         bool fatal_on_storage_error);
+FRESULT FMCore_ReadFile(const char *path, void *buf, uint32_t max_len,
+                        uint32_t *out_len, bool fatal_on_storage_error);
+FRESULT FMCore_AppendFile(const char *path, const void *data, uint32_t len,
+                          bool fatal_on_storage_error);
+FRESULT FMCore_Delete(const char *path, bool recursive, bool fatal_on_storage_error);
+FRESULT FMCore_CopyFile(const char *src, const char *dst, bool fatal_on_storage_error);
+bool FMCore_IsInitialized(void);
+FRESULT FMCore_NextIndexedPath(const char *dir, const char *ext,
+                               char *out, size_t out_sz);
+FRESULT FMCore_PrepareSystemStorage(void);
+FRESULT FMCore_AppendBootLog(const char *line, uint32_t len);
+bool FMCore_IsBootLogFaultFatal(void);
 FRESULT FMCore_WriteSystemDump(uint32_t code, const char *name,
                                const char *extra);
+
+const char *FMCore_FResultName(FRESULT res);
+bool FMCore_JoinPath(const char *base, const char *name, char *out, size_t out_sz);
 
 #ifdef __cplusplus
 }

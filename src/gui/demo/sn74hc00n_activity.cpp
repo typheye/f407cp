@@ -1,0 +1,306 @@
+/**
+ ******************************************************************************
+ * @file    sn74hc00n_activity.cpp
+ * @author  Typheye
+ * @brief   Sn74Hc00N Activity implementation.
+ ******************************************************************************
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
+#include "include/sn74hc00n_activity.hpp"
+#include "library/include/libdly.h"
+#include "library/include/libui.h"
+
+extern KeyManager keyManager;
+extern LCD boardLCD;
+extern SN74HC00N boardHC00N;
+
+/* Standard template functions (exact copy from key_test) */
+/* 01 Monitor sub-page (scrollable menu, key_test pattern) */
+static void hc00n_monitor_subpage(void) {
+  int sel = 0;
+  uint8_t le = 0;
+  uint32_t lu = 0;
+
+  while (1) {
+    keyManager._collisionA8.tick();
+    keyManager._collisionD0.tick();
+    keyManager._btnEnter.tick();
+
+    if (keyManager._collisionA8.getState() == KEY_PRESSED) {
+      sel = (sel + 1) % 5;
+      JPDelay(45);
+    }
+    if (keyManager._collisionD0.getState() == KEY_PRESSED) {
+      sel = (sel - 1 + 5) % 5;
+      JPDelay(45);
+    }
+
+    uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
+    if (ce && !le) {
+      if (sel == 0)
+        return;
+    }
+    le = ce;
+
+    if (HAL_GetTick() - lu > 16) {
+      lu = HAL_GetTick();
+      uint8_t outputs = boardHC00N.readOutputByte();
+
+      LCD_FLUSH({
+        UI_DrawFrameTitle("DEMO");
+
+        PD_SetFont(FONT_ASCII_16);
+        int cy = 33;
+
+        /* Item 0: 00 Return */
+        UI_DrawMenuCard(0, sel, cy, "00 Return");
+
+        /* Items 1-4: CH1 - CH4 */
+        for (int ch = 0; ch < 4; ch++) {
+          cy += 25;
+          uint8_t state = (outputs >> (3 - ch)) & 0x01;
+
+          char label[8];
+          snprintf(label, sizeof(label), " - CH%d", ch + 1);
+
+          const char *val = state ? "LOW" : "HIGH";
+
+          UI_DrawMenuValue(ch + 1, sel, cy, label, val, false);
+        }
+
+        PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
+      });
+    }
+    JPDelay(1);
+  }
+}
+
+/* 02 Truth Table sub-page (scrollable menu, key_test pattern) */
+static void hc00n_truth_subpage(void) {
+  /*
+   * NAND truth table (Y = NOT (A AND B)):
+   *   A=0 B=0 -> Y=1  (TOS_TEXT)
+   *   A=1 B=0 -> Y=1  (TOS_TEXT)
+   *   A=0 B=1 -> Y=1  (TOS_TEXT)
+   *   A=1 B=1 -> Y=0  (TOS_TEXT_SEC)
+   */
+  struct {
+    const char *label;
+    const char *value;
+  } tt_items[4] = {
+      {
+          " - A=0 B=0",
+          "Y=1",
+      },
+      {
+          " - A=1 B=0",
+          "Y=1",
+      },
+      {
+          " - A=0 B=1",
+          "Y=1",
+      },
+      {
+          " - A=1 B=1",
+          "Y=0",
+      },
+  };
+
+  int sel = 0;
+  uint8_t le = 0;
+  uint32_t lu = 0;
+
+  while (1) {
+    keyManager._collisionA8.tick();
+    keyManager._collisionD0.tick();
+    keyManager._btnEnter.tick();
+
+    if (keyManager._collisionA8.getState() == KEY_PRESSED) {
+      sel = (sel + 1) % 5;
+      JPDelay(45);
+    }
+    if (keyManager._collisionD0.getState() == KEY_PRESSED) {
+      sel = (sel - 1 + 5) % 5;
+      JPDelay(45);
+    }
+
+    uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
+    if (ce && !le) {
+      if (sel == 0)
+        return;
+    }
+    le = ce;
+
+    if (HAL_GetTick() - lu > 16) {
+      lu = HAL_GetTick();
+      LCD_FLUSH({
+        UI_DrawFrameTitle("DEMO");
+
+        PD_SetFont(FONT_ASCII_16);
+        int cy = 33;
+
+        /* Item 0: 00 Return */
+        UI_DrawMenuCard(0, sel, cy, "00 Return");
+
+        /* Items 1-4: NAND truth table rows */
+        for (int i = 0; i < 4; i++) {
+          cy += 25;
+          UI_DrawMenuValue(i + 1, sel, cy, tt_items[i].label, tt_items[i].value,
+                           false);
+        }
+
+        PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
+      });
+    }
+    JPDelay(1);
+  }
+}
+
+/* 03 Logic Test sub-page (scrollable menu, key_test pattern) */
+static void hc00n_test_subpage(void) {
+  int sel = 0;
+  uint8_t le = 0;
+  uint32_t lu = 0;
+
+  while (1) {
+    keyManager._collisionA8.tick();
+    keyManager._collisionD0.tick();
+    keyManager._btnEnter.tick();
+
+    if (keyManager._collisionA8.getState() == KEY_PRESSED) {
+      sel = (sel + 1) % 6;
+      JPDelay(45);
+    }
+    if (keyManager._collisionD0.getState() == KEY_PRESSED) {
+      sel = (sel - 1 + 6) % 6;
+      JPDelay(45);
+    }
+
+    uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
+    if (ce && !le) {
+      if (sel == 0)
+        return;
+    }
+    le = ce;
+
+    if (HAL_GetTick() - lu > 16) {
+      lu = HAL_GetTick();
+      uint8_t outputs = boardHC00N.readOutputByte();
+
+      LCD_FLUSH({
+        UI_DrawFrameTitle("DEMO");
+
+        PD_SetFont(FONT_ASCII_16);
+        int cy = 33;
+
+        /* Item 0: 00 Return */
+        UI_DrawMenuCard(0, sel, cy, "00 Return");
+
+        /* Items 1-4: CH1 - CH4 */
+        for (int ch = 0; ch < 4; ch++) {
+          cy += 25;
+          uint8_t state = (outputs >> (3 - ch)) & 0x01;
+
+          char label[8];
+          snprintf(label, sizeof(label), " - CH%d", ch + 1);
+
+          const char *val = state ? "LOW" : "HIGH";
+
+          UI_DrawMenuValue(ch + 1, sel, cy, label, val, false);
+        }
+
+        /* Item 5: Value <0x00> */
+        cy += 25;
+        char hexbuf[8];
+        snprintf(hexbuf, sizeof(hexbuf), "0x%02X", outputs);
+        UI_DrawMenuValue(5, sel, cy, " - Value", hexbuf, false);
+
+        PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
+      });
+    }
+    JPDelay(1);
+  }
+}
+
+/* Main activity (standard menu loop, key_test pattern) */
+#define HC00N_N 4
+void hc00n_activity(void) {
+  boardHC00N.init();
+
+  const char *items[HC00N_N] = {"00 Return", "01 Monitor", "02 Truth Table",
+                                "03 Logic Test"};
+
+  int sel = 0;
+  uint8_t le = 0;
+  uint32_t lu = 0;
+
+  while (1) {
+    keyManager._collisionA8.tick();
+    keyManager._collisionD0.tick();
+    keyManager._btnEnter.tick();
+
+    if (keyManager._collisionA8.getState() == KEY_PRESSED) {
+      sel = (sel + 1) % HC00N_N;
+      JPDelay(45);
+    }
+    if (keyManager._collisionD0.getState() == KEY_PRESSED) {
+      sel = (sel - 1 + HC00N_N) % HC00N_N;
+      JPDelay(45);
+    }
+
+    uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
+    if (ce && !le) {
+      switch (sel) {
+      case 0:
+        return;
+      case 1:
+        hc00n_monitor_subpage();
+        break;
+      case 2:
+        hc00n_truth_subpage();
+        break;
+      case 3:
+        hc00n_test_subpage();
+        break;
+      }
+    }
+    le = ce;
+
+    if (HAL_GetTick() - lu > 16) {
+      lu = HAL_GetTick();
+      LCD_FLUSH({
+        UI_DrawFrameTitle("DEMO");
+        PD_SetFont(FONT_ASCII_16);
+        int vis = HC00N_N < 7 ? HC00N_N : 7;
+        int start = sel - vis / 2;
+        if (start < 0)
+          start = 0;
+        if (start + vis > HC00N_N)
+          start = HC00N_N - vis;
+        for (int i = 0; i < vis; i++) {
+          int idx = start + i;
+          if (idx >= HC00N_N)
+            break;
+          int cy = 33 + i * 25;
+          UI_DrawMenuCard(idx, sel, cy, items[idx]);
+        }
+        PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
+      });
+    }
+    JPDelay(1);
+  }
+}

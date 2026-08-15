@@ -27,7 +27,7 @@ void UI_DrawMenuBool(int idx, int sel, int cy, const char *label, bool on,
                      bool editing);
 void UI_DrawStdFooter(void);
 int UI_MenuVisibleStart(int count, int sel, int visible);
-void UI_DrawSimpleMenu(const char *title, const char **items, int count,
+void UI_DrawSimpleMenu(const char *title, const char *const *items, int count,
                        int sel);
 int UI_MenuLoop(const char *title, const char **items, int count,
                 int start_sel);

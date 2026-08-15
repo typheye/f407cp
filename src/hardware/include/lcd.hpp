@@ -16,6 +16,11 @@ public:
   void setBrightness(uint16_t value);
   uint16_t getBrightness() const { return _brightness; }
   void adjustBrightness(int16_t delta);
+  void setAutoBrightness(bool enabled);
+  bool getAutoBrightness() const { return _autoBrightness; }
+  void setRotation(uint8_t rotation);
+  uint8_t getRotation() const { return _rotation; }
+  void updateAutoBrightness();
   uint16_t rgb888ToRgb565(uint32_t color) const;
   uint16_t *getFrameBuffer();
   void beginTileRender(uint16_t y, uint16_t h);
@@ -36,6 +41,8 @@ public:
 
 private:
   bool _initialized;
+  bool _autoBrightness;
+  uint8_t _rotation;
   uint16_t _brightness;
   uint16_t _tileY;
   uint16_t _tileH;
