@@ -111,8 +111,21 @@ static SBL_CODE void splash_lcd_data16(uint16_t data) {
   splash_lcd_data_bytes(bytes, sizeof(bytes));
 }
 
+static SBL_CODE void splash_lcd_flip_window(uint16_t *x0, uint16_t *y0,
+                                            uint16_t *x1, uint16_t *y1) {
+  uint16_t tx0 = (uint16_t)(SBL_LCD_W - 1U - *x1);
+  uint16_t ty0 = (uint16_t)(SBL_LCD_H - 1U - *y1);
+  uint16_t tx1 = (uint16_t)(SBL_LCD_W - 1U - *x0);
+  uint16_t ty1 = (uint16_t)(SBL_LCD_H - 1U - *y0);
+  *x0 = tx0;
+  *y0 = ty0;
+  *x1 = tx1;
+  *y1 = ty1;
+}
+
 static SBL_CODE void splash_lcd_addr(uint16_t x0, uint16_t y0,
                                      uint16_t x1, uint16_t y1) {
+  splash_lcd_flip_window(&x0, &y0, &x1, &y1);
   splash_lcd_cmd(0x2AU);
   splash_lcd_data16(x0);
   splash_lcd_data16(x1);
@@ -169,7 +182,8 @@ static SBL_CODE void splash_lcd_init(void) {
   splash_lcd_cmd(0x01U); SBL_DelayMs(150U);
   splash_lcd_cmd(0x11U); SBL_DelayMs(120U);
   splash_lcd_cmd(0x3AU); splash_lcd_data(0x55U);
-  splash_lcd_cmd(0x36U); splash_lcd_data(0x10U);
+  /* Native CW plus splash_lcd_flip_window() gives logical CCW output. */
+  splash_lcd_cmd(0x36U); splash_lcd_data(0x60U);
   splash_lcd_cmd(0xB2U);
   { uint8_t d[] = {0x0C, 0x0C, 0x00, 0x33, 0x33}; splash_lcd_data_bytes(d, sizeof(d)); }
   splash_lcd_cmd(0xB7U); splash_lcd_data(0x35U);

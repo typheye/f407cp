@@ -54,8 +54,23 @@ static SBL_CODE void sbl_lcd_data16(uint16_t data) {
   sbl_lcd_data((uint8_t)data);
 }
 
+/* The panel's native CCW MADCTL mode has a column offset. Keep the stable
+ * native CW mode and compensate with a logical 180-degree coordinate flip. */
+static SBL_CODE void sbl_lcd_flip_window(uint16_t *x0, uint16_t *y0,
+                                         uint16_t *x1, uint16_t *y1) {
+  uint16_t tx0 = (uint16_t)(SBL_LCD_W - 1U - *x1);
+  uint16_t ty0 = (uint16_t)(SBL_LCD_H - 1U - *y1);
+  uint16_t tx1 = (uint16_t)(SBL_LCD_W - 1U - *x0);
+  uint16_t ty1 = (uint16_t)(SBL_LCD_H - 1U - *y0);
+  *x0 = tx0;
+  *y0 = ty0;
+  *x1 = tx1;
+  *y1 = ty1;
+}
+
 static SBL_CODE void sbl_lcd_addr(uint16_t x0, uint16_t y0,
                                   uint16_t x1, uint16_t y1) {
+  sbl_lcd_flip_window(&x0, &y0, &x1, &y1);
   sbl_lcd_cmd(0x2AU);
   sbl_lcd_data16(x0);
   sbl_lcd_data16(x1);
@@ -127,7 +142,9 @@ static SBL_CODE void sbl_lcd_init_impl(uint8_t visible) {
   sbl_lcd_cmd(0x3AU);
   sbl_lcd_data(0x55U);
   sbl_lcd_cmd(0x36U);
-  sbl_lcd_data(0x10U);
+  /* Native CW is stable; sbl_lcd_flip_window() supplies the CCW software
+   * compatibility transform without the panel's native offset artifact. */
+  sbl_lcd_data(0x60U);
 
   static const uint8_t seq_b2[] SBL_CONST = {0x0C, 0x0C, 0x00, 0x33, 0x33};
   static const uint8_t seq_d0[] SBL_CONST = {0xA4, 0xA1};
