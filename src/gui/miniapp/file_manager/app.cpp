@@ -433,11 +433,11 @@ void file_manager_run(void) {
 
     if (n > 0 && keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % n;
-      JPDelay(45);
+      JPDelay(8);
     }
     if (n > 0 && keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + n) % n;
-      JPDelay(45);
+      JPDelay(8);
     }
 
     if ((HAL_GetTick() - last_probe) > 1200U && fm_mounted &&
@@ -468,10 +468,10 @@ void file_manager_run(void) {
         sel = n > 0 ? n - 1 : 0;
       }
       lu = 0;
-      JPDelay(45);
+      JPDelay(8);
     }
 
-    if (HAL_GetTick() - lu > 16) {
+    if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
       LCD_FLUSH({
         UI_DrawFrameTitle("FILE");

@@ -158,11 +158,11 @@ int UI_MenuLoop(const char *title, const char **items, int count,
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % count;
-      JPDelay(25);
+      JPDelay(8);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + count) % count;
-      JPDelay(25);
+      JPDelay(8);
     }
 
     uint8_t enter = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -171,7 +171,7 @@ int UI_MenuLoop(const char *title, const char **items, int count,
     }
     last_enter = enter;
 
-    if ((uint32_t)(HAL_GetTick() - last_update) > 16U) {
+    if ((uint32_t)(HAL_GetTick() - last_update) > 1U) {
       last_update = HAL_GetTick();
       UI_DrawSimpleMenu(title, items, count, sel);
     }

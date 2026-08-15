@@ -37,7 +37,7 @@ void alert_show(const char *title, const char *msg) {
     if (keyManager._btnEnter.getState() == KEY_PRESSED)
       return;
 
-    if (HAL_GetTick() - lu > 16) {
+    if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
 
       LCD_FLUSH({

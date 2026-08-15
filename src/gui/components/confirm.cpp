@@ -113,11 +113,11 @@ bool confirm_show(const char *title, const char *msg) {
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % 2;
-      JPDelay(45);
+      JPDelay(8);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + 2) % 2;
-      JPDelay(45);
+      JPDelay(8);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -127,7 +127,7 @@ bool confirm_show(const char *title, const char *msg) {
     }
     le = ce;
 
-    if (HAL_GetTick() - lu > 16) {
+    if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
       LCD_FLUSH({
         PD_Init();

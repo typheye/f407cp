@@ -119,7 +119,6 @@ void display_activity_run(void) {
   edit_field = 0;
 
   int sel = 0;
-  uint8_t le = 0;
   uint32_t lu = 0;
 
   while (1) {
@@ -144,7 +143,7 @@ void display_activity_run(void) {
       } else {
         sel = (sel + 1) % item_count();
       }
-      JPDelay(25);
+      JPDelay(8);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       if (disp_edit) {
@@ -162,11 +161,10 @@ void display_activity_run(void) {
       } else {
         sel = (sel - 1 + item_count()) % item_count();
       }
-      JPDelay(25);
+      JPDelay(8);
     }
 
-    uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
-    if (ce && !le) {
+    if (keyManager._btnEnter.getState() == KEY_PRESSED) {
       if (disp_edit) {
         disp_edit = false;
         edit_field = 0;
@@ -200,9 +198,7 @@ void display_activity_run(void) {
         }
       }
     }
-    le = ce;
-
-    if (HAL_GetTick() - lu > 16) {
+    if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
       draw_disp(sel);
     }

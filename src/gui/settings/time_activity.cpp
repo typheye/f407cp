@@ -93,7 +93,6 @@ void time_activity_run(void) {
            t.seconds);
 
   int sel = 0;
-  uint8_t le = 0;
   uint32_t lu = 0;
 
   while (1) {
@@ -112,21 +111,20 @@ void time_activity_run(void) {
           style_24h = !style_24h;
           SM_Time_SetStyle24h(style_24h);
         }
-        JPDelay(45);
+        JPDelay(8);
       }
     } else {
       if (keyManager._collisionA8.getState() == KEY_PRESSED) {
         sel = (sel + 1) % 6;
-        JPDelay(45);
+        JPDelay(8);
       }
       if (keyManager._collisionD0.getState() == KEY_PRESSED) {
         sel = (sel - 1 + 6) % 6;
-        JPDelay(45);
+        JPDelay(8);
       }
     }
 
-    uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
-    if (ce && !le) {
+    if (keyManager._btnEnter.getState() == KEY_PRESSED) {
       if (editing) {
         editing = false;
         edit_sel = -1;
@@ -174,9 +172,7 @@ void time_activity_run(void) {
         }
       }
     }
-    le = ce;
-
-    if (HAL_GetTick() - lu > 16) {
+    if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
       boardTRTC.getDateTime(&t, &d);
       snprintf(date_buf, sizeof(date_buf), "%04d-%02d-%02d", 2000 + d.year,

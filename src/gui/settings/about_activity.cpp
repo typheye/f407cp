@@ -72,7 +72,7 @@ static void debug_page(void) {
       } else {
         sel = (sel + 1) % 6;
       }
-      JPDelay(45);
+      JPDelay(8);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       if (editing && sel == 1) {
@@ -82,7 +82,7 @@ static void debug_page(void) {
       } else {
         sel = (sel - 1 + 6) % 6;
       }
-      JPDelay(45);
+      JPDelay(8);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -126,7 +126,7 @@ static void debug_page(void) {
     }
     le = ce;
 
-    if (HAL_GetTick() - lu > 16U) {
+    if (HAL_GetTick() - lu > 1U) {
       lu = HAL_GetTick();
       LCD_FLUSH({
         UI_DrawFrameTitle("DEBUG");
@@ -215,7 +215,7 @@ void about_activity_run(void) {
         handle_build_debug_click(now, false);
       }
       dirty = true;
-      JPDelay(45);
+      JPDelay(8);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + AM_N) % AM_N;
@@ -223,7 +223,7 @@ void about_activity_run(void) {
         handle_build_debug_click(now, false);
       }
       dirty = true;
-      JPDelay(45);
+      JPDelay(8);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);

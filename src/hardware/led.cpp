@@ -58,10 +58,12 @@ void LED::blink(uint32_t delay_ms) {
 }
 
 LED boardLed(GPIOC, GPIO_PIN_13, false);
-LED redLed(GPIOF, GPIO_PIN_6, false);
-LED greenLed(GPIOF, GPIO_PIN_7, false);
-LED blueLed(GPIOF, GPIO_PIN_8, false);
-LED whiteLed(GPIOF, GPIO_PIN_9, false);
+/* Keep the SYSTEM image aligned with the ELF/SBL board contract:
+ * PF6..PF9 are active high, therefore LOW is the safe/off state. */
+LED redLed(GPIOF, GPIO_PIN_6, true);
+LED greenLed(GPIOF, GPIO_PIN_7, true);
+LED blueLed(GPIOF, GPIO_PIN_8, true);
+LED whiteLed(GPIOF, GPIO_PIN_9, true);
 
 extern "C" {
 void LED_BoardOff(void) { boardLed.off(); }

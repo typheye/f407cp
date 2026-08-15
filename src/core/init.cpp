@@ -29,6 +29,8 @@
 #include "hardware/include/key.hpp"
 #include "hardware/include/lcd.hpp"
 #include "hardware/include/secondary_clock.hpp"
+#include "hardware/include/tsdio.hpp"
+#include "core/manager/include/settings_manager.h"
 #include "library/include/libdly.h"
 #include "library/include/libpd.h"
 #include "manifest.h"
@@ -47,7 +49,7 @@ void APP::init() {
   blueLed.init();
   whiteLed.init();
   HAL_GPIO_WritePin(GPIOF, GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9,
-                    GPIO_PIN_SET);
+                    GPIO_PIN_RESET);
 
   buzzer1.init();
   JPDelay(50);
@@ -61,6 +63,12 @@ void APP::init() {
   PD_ShowSplashFadeStart(650U);
 
   keyManager.init();
+  SM_Init();
+  if (boardSDIO.init() == SD_CARD_OK) {
+    SM_Mount();
+  } else {
+    LOG_W("SDIO", "SD card unavailable at boot");
+  }
 
   EmotionManager_Init();
   TosApi_Init();

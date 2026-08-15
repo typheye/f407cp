@@ -78,10 +78,11 @@ public:
   Switch _swSdDetect{GPIOE, GPIO_PIN_1, true};
   Switch _swMute{nullptr, 0U, true};
 
-  Key up{GPIOA, GPIO_PIN_0, true};
-  Key down{GPIOE, GPIO_PIN_4, true};
-  Key confirm{GPIOE, GPIO_PIN_3, true};
-  Key spare{GPIOE, GPIO_PIN_2, true};
+  /* PA0 remains available as the Wake-Up/spare key. */
+  Key up{GPIOE, GPIO_PIN_4, true};       /* KEY2 */
+  Key down{GPIOE, GPIO_PIN_3, true};     /* KEY3 */
+  Key confirm{GPIOE, GPIO_PIN_2, true};  /* KEY4 */
+  Key spare{GPIOA, GPIO_PIN_0, true};    /* KEY1 / Wake-Up */
 
   Key &_collisionA8; /* TOS "next/down" semantic */
   Key &_collisionD0; /* TOS "previous/up" semantic */

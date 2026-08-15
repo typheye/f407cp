@@ -3,7 +3,19 @@
 #include "library/include/liboledgfx.h"
 
 namespace {
-constexpr uint32_t kI2cTimeoutMs = 100U;
+constexpr uint32_t kI2cTimeoutMs = 25U;
+constexpr uint32_t kFastI2cClockHz = 400000U;
+
+void configureFastI2c(I2C_HandleTypeDef *i2c) {
+  if (i2c == nullptr || i2c->Instance == nullptr ||
+      i2c->Init.ClockSpeed == kFastI2cClockHz) {
+    return;
+  }
+
+  i2c->Init.ClockSpeed = kFastI2cClockHz;
+  i2c->Init.DutyCycle = I2C_DUTYCYCLE_2;
+  (void)HAL_I2C_Init(i2c);
+}
 }
 
 SSD1315::SSD1315(I2C_HandleTypeDef *i2c, uint8_t address)
@@ -31,6 +43,7 @@ bool SSD1315::init() {
   };
 
   _ready = false;
+  configureFastI2c(_i2c);
   for (uint8_t candidate : candidates) {
     if (HAL_I2C_IsDeviceReady(_i2c, static_cast<uint16_t>(candidate << 1U),
                               2U, kI2cTimeoutMs) == HAL_OK) {
@@ -53,16 +66,34 @@ bool SSD1315::display(const uint8_t *buffer, std::size_t size) {
       !sendCommands(windowCommands, sizeof(windowCommands)))
     return false;
 
-  uint8_t packet[17];
+  uint8_t packet[129];
   packet[0] = 0x40U;
-  for (std::size_t offset = 0U; offset < size; offset += 16U) {
-    for (std::size_t i = 0U; i < 16U; ++i)
+  for (std::size_t offset = 0U; offset < size; offset += 128U) {
+    for (std::size_t i = 0U; i < 128U; ++i)
       packet[i + 1U] = buffer[offset + i];
     if (HAL_I2C_Master_Transmit(_i2c, static_cast<uint16_t>(_address << 1U),
                                 packet, sizeof(packet), kI2cTimeoutMs) != HAL_OK)
       return false;
   }
   return true;
+}
+
+bool SSD1315::displayPage(uint8_t page, const uint8_t *pageBuffer) {
+  if (!_ready || page >= 8U || pageBuffer == nullptr)
+    return false;
+
+  const uint8_t windowCommands[] = {0x21U, 0x00U, 0x7FU, 0x22U, page, page};
+  if (!sendCommands(windowCommands, sizeof(windowCommands)))
+    return false;
+
+  uint8_t packet[129];
+  packet[0] = 0x40U;
+  for (std::size_t i = 0U; i < 128U; ++i)
+    packet[i + 1U] = pageBuffer[i];
+
+  return HAL_I2C_Master_Transmit(_i2c, static_cast<uint16_t>(_address << 1U),
+                                 packet, sizeof(packet), kI2cTimeoutMs) ==
+         HAL_OK;
 }
 
 bool SSD1315::setDisplayOn(bool enabled) {

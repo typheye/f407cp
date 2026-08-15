@@ -40,7 +40,7 @@ void APP::start() {
     SysUI::updateCpuUsage(elapsed);
     TosApi_Tick();
     SysWatchdog_Tick();
-    JPDelay(10U);
+    JPDelay(1U);
   }
 }
 

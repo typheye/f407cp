@@ -30,7 +30,6 @@ extern LCD boardLCD;
 
 void sound_activity_run(void) {
   int sel = 0;
-  uint8_t le = 0;
   uint32_t lu = 0;
   bool edit = false;
   bool boot_gfx = SM_BootGfx();
@@ -43,7 +42,7 @@ void sound_activity_run(void) {
       } else {
         sel = (sel + 1) % 3;
       }
-      JPDelay(45);
+      JPDelay(8);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       if (edit && sel == 2) {
@@ -51,11 +50,10 @@ void sound_activity_run(void) {
       } else {
         sel = (sel - 1 + 3) % 3;
       }
-      JPDelay(45);
+      JPDelay(8);
     }
 
-    uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
-    if (ce && !le) {
+    if (keyManager._btnEnter.getState() == KEY_PRESSED) {
       if (edit) {
         if (sel == 2) {
           SM_SetBootGfx(boot_gfx);
@@ -68,9 +66,7 @@ void sound_activity_run(void) {
         edit = true;
       }
     }
-    le = ce;
-
-    if (HAL_GetTick() - lu > 16) {
+    if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
       bool muted = keyManager.isMuted();
       LCD_FLUSH({

@@ -10,6 +10,7 @@ uint8_t frameBuffer[LIBOLEDGFX_BUFFER_SIZE];
 uint8_t lastSecond = 0xFFU;
 uint32_t lastFrameMs = 0U;
 uint8_t wavePhase = 0U;
+uint8_t pendingPage = 8U;
 bool running;
 
 const char *weekdayName(uint8_t weekday) {
@@ -18,7 +19,7 @@ const char *weekdayName(uint8_t weekday) {
   return names[weekday <= 7U ? weekday : 0U];
 }
 
-bool render(uint8_t phase) {
+bool compose(uint8_t phase) {
   RTC_TimeTypeDef time{};
   RTC_DateTypeDef date{};
   if (HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN) != HAL_OK ||
@@ -28,11 +29,23 @@ bool render(uint8_t phase) {
       frameBuffer, static_cast<uint16_t>(2000U + date.Year), date.Month,
       date.Date, weekdayName(date.WeekDay), time.Hours, time.Minutes,
       time.Seconds, phase);
-  if (!oled.display(frameBuffer, sizeof(frameBuffer)))
-    return false;
   lastSecond = time.Seconds;
   lastFrameMs = HAL_GetTick();
   return true;
+}
+
+bool displayFullBlocking() { return oled.display(frameBuffer, sizeof(frameBuffer)); }
+
+void startPagedRefresh() { pendingPage = 0U; }
+
+void servicePagedRefresh() {
+  if (pendingPage >= 8U)
+    return;
+  if (oled.displayPage(pendingPage, &frameBuffer[pendingPage * 128U])) {
+    pendingPage++;
+  } else {
+    pendingPage = 8U;
+  }
 }
 } // namespace
 
@@ -41,13 +54,15 @@ void SecondaryClock_Init() {
   lastSecond = 0xFFU;
   lastFrameMs = 0U;
   wavePhase = 0U;
+  pendingPage = 8U;
   if (!oled.init()) {
     LOG_W("OLED", "SSD1315 not found at 0x3C/0x3D");
     return;
   }
 
   LibOledGfx_Clear(frameBuffer, 0U);
-  if (!oled.display(frameBuffer, sizeof(frameBuffer)) || !render(wavePhase) ||
+  if (!oled.display(frameBuffer, sizeof(frameBuffer)) || !compose(wavePhase) ||
+      !displayFullBlocking() ||
       !oled.setDisplayOn(true)) {
     (void)oled.setDisplayOn(false);
     LOG_W("OLED", "SSD1315 clock initialization failed");
@@ -60,10 +75,15 @@ void SecondaryClock_Init() {
 void SecondaryClock_Tick() {
   if (!running)
     return;
+  servicePagedRefresh();
+  if (pendingPage < 8U)
+    return;
+
   uint32_t now = HAL_GetTick();
   if ((uint32_t)(now - lastFrameMs) < 250U)
     return;
 
   wavePhase = static_cast<uint8_t>((wavePhase + 1U) & 0x0FU);
-  (void)render(wavePhase);
+  if (compose(wavePhase))
+    startPagedRefresh();
 }
