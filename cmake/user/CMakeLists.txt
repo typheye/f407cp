@@ -1,6 +1,7 @@
 # User include directories
 set(USER_Include_Dirs
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/
@@ -34,7 +35,7 @@ list(FILTER USER_GUI_Src EXCLUDE REGEX ".*/include/wlan_activity\\.hpp$")
 list(FILTER USER_GUI_Src EXCLUDE REGEX ".*/include/hotspot_activity\\.hpp$")
 
 set(USER_Application_Src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/app.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/tos.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/core/init.cpp
     ${USER_SYS_Src}
     ${USER_MANAGER_Src}

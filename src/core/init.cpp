@@ -28,6 +28,7 @@
 #include "hardware/include/cdc_bridge.h"
 #include "hardware/include/key.hpp"
 #include "hardware/include/lcd.hpp"
+#include "hardware/include/sfhd.h"
 #include "hardware/include/secondary_clock.hpp"
 #include "hardware/include/tsdio.hpp"
 #include "core/manager/include/settings_manager.h"
@@ -40,6 +41,16 @@ extern "C" {}
 
 extern LED boardLed;
 extern Buzzer buzzer1;
+
+static void request_recovery_init(void) {
+  LOG_W("MAIN", "Requesting RECOVERY_INIT");
+  if (Flash_BL_SetBootTarget(FLASH_BL_BOOT_RECOVERY_INIT) == FLASH_OK) {
+    SysWatchdog_FeedNow();
+    NVIC_SystemReset();
+  } else {
+    LOG_E("MAIN", "Failed to set RECOVERY_INIT");
+  }
+}
 
 void APP::init() {
 
@@ -65,9 +76,15 @@ void APP::init() {
   keyManager.init();
   SM_Init();
   if (boardSDIO.init() == SD_CARD_OK) {
-    SM_Mount();
+    if (!SM_Mount()) {
+      request_recovery_init();
+      return;
+    }
   } else {
     LOG_W("SDIO", "SD card unavailable at boot");
+  }
+  if (SM_BootGfx() && !SM_SoundMute()) {
+    buzzer1.beepSuccess();
   }
 
   EmotionManager_Init();

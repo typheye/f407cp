@@ -32,49 +32,59 @@ void sound_activity_run(void) {
   int sel = 0;
   uint32_t lu = 0;
   bool edit = false;
-  bool boot_gfx = SM_BootGfx();
+  bool pending_boot_gfx = SM_BootGfx();
+  bool pending_mute = SM_SoundMute();
 
   while (1) {
     keyManager._collisionA8.tick(); keyManager._collisionD0.tick(); keyManager._btnEnter.tick();
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
-      if (edit && sel == 2) {
-        boot_gfx = !boot_gfx;
+      if (edit && sel == 1) {
+        pending_mute = !pending_mute;
+        SM_SetSoundMute(pending_mute);
+      } else if (edit && sel == 2) {
+        pending_boot_gfx = !pending_boot_gfx;
+        SM_SetBootGfx(pending_boot_gfx);
       } else {
         sel = (sel + 1) % 3;
       }
-      JPDelay(8);
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
-      if (edit && sel == 2) {
-        boot_gfx = !boot_gfx;
+      if (edit && sel == 1) {
+        pending_mute = !pending_mute;
+        SM_SetSoundMute(pending_mute);
+      } else if (edit && sel == 2) {
+        pending_boot_gfx = !pending_boot_gfx;
+        SM_SetBootGfx(pending_boot_gfx);
       } else {
         sel = (sel - 1 + 3) % 3;
       }
-      JPDelay(8);
+      JPDelay(2);
     }
 
     if (keyManager._btnEnter.getState() == KEY_PRESSED) {
       if (edit) {
-        if (sel == 2) {
-          SM_SetBootGfx(boot_gfx);
-        }
         edit = false;
       } else if (sel == 0) {
         return;
+      } else if (sel == 1) {
+        pending_mute = SM_SoundMute();
+        edit = true;
       } else if (sel == 2) {
-        boot_gfx = SM_BootGfx();
+        pending_boot_gfx = SM_BootGfx();
         edit = true;
       }
     }
     if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
-      bool muted = keyManager.isMuted();
       LCD_FLUSH({
         UI_DrawFrameTitle("SOUND");
         PD_SetFont(FONT_ASCII_16);
         UI_DrawMenuCard(0, sel, 33, "00 Return");
-        UI_DrawMenuBool(1, sel, 58, "01 Mute", !muted, false);
-        UI_DrawMenuBool(2, sel, 83, "02 Boot GFX", boot_gfx, edit && sel == 2);
+        UI_DrawMenuBool(1, sel, 58, "01 Mute", pending_mute,
+                        edit && sel == 1);
+        UI_DrawMenuBool(2, sel, 83, "02 Boot GFX", pending_boot_gfx,
+                        edit && sel == 2);
         UI_DrawStdFooter();
       });
     }

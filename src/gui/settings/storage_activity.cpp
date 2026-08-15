@@ -217,7 +217,7 @@ void storage_activity_run(void) {
     PD_SetColor(TOS_TEXT);
     PD_DrawString(26, 33, "Refreshing...");
   });
-  JPDelay(500);
+  JPDelay(80);
 
   refresh();
 
@@ -231,11 +231,11 @@ void storage_activity_run(void) {
     keyManager._btnEnter.tick();
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % 2;
-      JPDelay(8);
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + 2) % 2;
-      JPDelay(8);
+      JPDelay(2);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -253,7 +253,7 @@ void storage_activity_run(void) {
           PD_SetColor(TOS_TEXT);
           PD_DrawString(26, 33, "Refreshing...");
         });
-        JPDelay(500);
+        JPDelay(8);
         refresh();
         lu = 0;
       }

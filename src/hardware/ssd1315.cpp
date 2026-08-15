@@ -19,11 +19,12 @@ void configureFastI2c(I2C_HandleTypeDef *i2c) {
 }
 
 SSD1315::SSD1315(I2C_HandleTypeDef *i2c, uint8_t address)
-    : _i2c(i2c), _address(address), _ready(false) {}
+    : _i2c(i2c), _address(address), _ready(false), _dmaBusy(false),
+      _dmaError(false), _dmaPacket{} {}
 
 bool SSD1315::sendCommands(const uint8_t *commands, std::size_t size) {
   uint8_t packet[32];
-  if (commands == nullptr || size == 0U || size >= sizeof(packet))
+  if (_dmaBusy || commands == nullptr || size == 0U || size >= sizeof(packet))
     return false;
   packet[0] = 0x00U;
   for (std::size_t i = 0; i < size; ++i)
@@ -96,11 +97,53 @@ bool SSD1315::displayPage(uint8_t page, const uint8_t *pageBuffer) {
          HAL_OK;
 }
 
+bool SSD1315::displayPageDma(uint8_t page, const uint8_t *pageBuffer) {
+  if (!_ready || _dmaBusy || page >= 8U || pageBuffer == nullptr)
+    return false;
+
+  const uint8_t windowCommands[] = {0x21U, 0x00U, 0x7FU, 0x22U, page, page};
+  if (!sendCommands(windowCommands, sizeof(windowCommands)))
+    return false;
+
+  _dmaPacket[0] = 0x40U;
+  for (std::size_t i = 0U; i < 128U; ++i)
+    _dmaPacket[i + 1U] = pageBuffer[i];
+
+  _dmaError = false;
+  _dmaBusy = true;
+  if (HAL_I2C_Master_Transmit_DMA(_i2c, static_cast<uint16_t>(_address << 1U),
+                                  _dmaPacket, sizeof(_dmaPacket)) != HAL_OK) {
+    _dmaBusy = false;
+    return false;
+  }
+  return true;
+}
+
 bool SSD1315::setDisplayOn(bool enabled) {
-  if (!_ready)
+  if (!_ready || _dmaBusy)
     return false;
   const uint8_t command = enabled ? 0xAFU : 0xAEU;
   return sendCommands(&command, 1U);
 }
 
+void SSD1315::onDmaTxComplete(I2C_HandleTypeDef *i2c) {
+  if (i2c == _i2c)
+    _dmaBusy = false;
+}
+
+void SSD1315::onI2cError(I2C_HandleTypeDef *i2c) {
+  if (i2c == _i2c) {
+    _dmaError = true;
+    _dmaBusy = false;
+  }
+}
+
 SSD1315 oled(&hi2c1);
+
+extern "C" void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c) {
+  oled.onDmaTxComplete(hi2c);
+}
+
+extern "C" void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+  oled.onI2cError(hi2c);
+}

@@ -60,16 +60,22 @@ void LCD::writeData16(uint16_t data) {
 }
 
 void LCD::setAddress(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
-  const uint16_t fx0 = static_cast<uint16_t>(LCD_WIDTH - 1U - x1);
-  const uint16_t fy0 = static_cast<uint16_t>(LCD_HEIGHT - 1U - y1);
-  const uint16_t fx1 = static_cast<uint16_t>(LCD_WIDTH - 1U - x0);
-  const uint16_t fy1 = static_cast<uint16_t>(LCD_HEIGHT - 1U - y0);
+  if (_rotation == 0U) {
+    const uint16_t fx0 = static_cast<uint16_t>(LCD_WIDTH - 1U - x1);
+    const uint16_t fy0 = static_cast<uint16_t>(LCD_HEIGHT - 1U - y1);
+    const uint16_t fx1 = static_cast<uint16_t>(LCD_WIDTH - 1U - x0);
+    const uint16_t fy1 = static_cast<uint16_t>(LCD_HEIGHT - 1U - y0);
+    x0 = fx0;
+    y0 = fy0;
+    x1 = fx1;
+    y1 = fy1;
+  }
   writeCommand(0x2AU);
-  writeData16(fx0);
-  writeData16(fx1);
+  writeData16(x0);
+  writeData16(x1);
   writeCommand(0x2BU);
-  writeData16(fy0);
-  writeData16(fy1);
+  writeData16(y0);
+  writeData16(y1);
   writeCommand(0x2CU);
 }
 
@@ -220,10 +226,12 @@ void LCD::endTileRender() {
     const uint16_t value = tileBuffer[i];
     tileBuffer[i] = static_cast<uint16_t>((value << 8U) | (value >> 8U));
   }
-  for (uint32_t left = 0U, right = pixels - 1U; left < right; ++left, --right) {
-    const uint16_t value = tileBuffer[left];
-    tileBuffer[left] = tileBuffer[right];
-    tileBuffer[right] = value;
+  if (_rotation == 0U) {
+    for (uint32_t left = 0U, right = pixels - 1U; left < right; ++left, --right) {
+      const uint16_t value = tileBuffer[left];
+      tileBuffer[left] = tileBuffer[right];
+      tileBuffer[right] = value;
+    }
   }
   setAddress(0U, _tileY, LCD_WIDTH - 1U,
              static_cast<uint16_t>(_tileY + _tileH - 1U));

@@ -22,6 +22,7 @@
 
 #include "include/settings_manager.h"
 #include "ff.h"
+#include "fatfs.h"
 #include "library/include/libdly.h"
 #include <stddef.h>
 
@@ -79,6 +80,7 @@ static void sanitize(void) {
   g_settings.time_style_24h = g_settings.time_style_24h ? true : false;
   g_settings.hotspot_auto_close =
       g_settings.hotspot_auto_close ? true : false;
+  g_settings.sound_mute = g_settings.sound_mute ? true : false;
   if (g_settings.disp_bright < 1U || g_settings.disp_bright > 10U) {
     g_settings.disp_bright = 10U;
   }
@@ -122,8 +124,18 @@ static void defaults(void) {
   g_settings.time_style_24h     = true;
   g_settings.hotspot_auto_close = true;
   g_settings.boot_gfx           = true;
+  g_settings.sound_mute         = true;
   copy_str(g_settings.hotspot_ip, "192.168.4.1", sizeof(g_settings.hotspot_ip));
   LOG_D("SMGR", "Defaults loaded");
+}
+
+static bool ensure_mounted(void) {
+  FRESULT res = f_mount(&SDFatFS, "0:", 1);
+  if (res != FR_OK) {
+    LOG_W("SMGR", "Mount failed (%d)", (int)res);
+    return false;
+  }
+  return true;
 }
 
 /* ========== Load from SD card ========== */
@@ -187,38 +199,42 @@ void SM_Init(void) {
   defaults();
 }
 
-void SM_Mount(void) {
+bool SM_Mount(void) {
   FIL file;
   FRESULT res;
 
   g_sd_available = false;
-  res = f_mkdir("0:/data");
-  if (res != FR_OK && res != FR_EXIST) {
-    LOG_W("SMGR", "Cannot create data directory (%d)", (int)res);
-    return;
+  if (!ensure_mounted()) {
+    LOG_W("SMGR", "SD not available");
+    return false;
   }
 
   for (int retry = 0; retry < 3; ++retry) {
     res = f_open(&file, "0:/data/settings.bin", FA_OPEN_EXISTING);
-    if (res == FR_OK) { g_sd_available = true; f_close(&file); break; }
-    if (res != FR_NOT_READY) break;
+    if (res == FR_OK) {
+      g_sd_available = true;
+      f_close(&file);
+      break;
+    }
+    if (res != FR_NOT_READY) {
+      break;
+    }
     JPDelay(200);
   }
 
   if (!g_sd_available) {
-    res = f_open(&file, "0:/data/settings.bin", FA_CREATE_NEW);
-    if (res == FR_OK) { g_sd_available = true; f_close(&file); }
+    LOG_W("SMGR", "Settings file unavailable");
+    return false;
   }
-
-  if (!g_sd_available) { LOG_W("SMGR", "SD not available"); return; }
 
   if (!load()) {
     LOG_W("SMGR", "Load failed, using defaults");
-    SM_Save();
+    return false;
   } else if (g_settings_needs_migration) {
     g_settings_needs_migration = false;
     SM_Save();
   }
+  return true;
 }
 
 void SM_Save(void) {
@@ -231,6 +247,11 @@ void SM_Save(void) {
   sanitize();
   g_settings.magic = SM_MAGIC;
   g_settings.crc = settings_crc(&g_settings);
+  if (!g_sd_available && !ensure_mounted()) {
+    LOG_W("SMGR", "Save: mount failed");
+    return;
+  }
+  (void)f_mkdir("0:/data");
   res = f_open(&file, "0:/data/settings.bin", FA_CREATE_ALWAYS | FA_WRITE);
   g_sd_available = false;
   if (res == FR_OK) {
@@ -435,6 +456,11 @@ bool SM_BootGfx(void) { return g_settings.boot_gfx; }
 void SM_SetBootGfx(bool v) {
   v = v ? true : false;
   if (g_settings.boot_gfx != v) { g_settings.boot_gfx = v; SM_Save(); }
+}
+bool SM_SoundMute(void) { return g_settings.sound_mute; }
+void SM_SetSoundMute(bool v) {
+  v = v ? true : false;
+  if (g_settings.sound_mute != v) { g_settings.sound_mute = v; SM_Save(); }
 }
 
 /* --- Status icon helpers (C-callable) --- */

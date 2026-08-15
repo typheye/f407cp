@@ -11,6 +11,7 @@ uint8_t lastSecond = 0xFFU;
 uint32_t lastFrameMs = 0U;
 uint8_t wavePhase = 0U;
 uint8_t pendingPage = 8U;
+uint8_t pageRetry = 0U;
 bool running;
 
 const char *weekdayName(uint8_t weekday) {
@@ -41,10 +42,16 @@ void startPagedRefresh() { pendingPage = 0U; }
 void servicePagedRefresh() {
   if (pendingPage >= 8U)
     return;
-  if (oled.displayPage(pendingPage, &frameBuffer[pendingPage * 128U])) {
+  if (oled.busy())
+    return;
+  if (oled.displayPageDma(pendingPage, &frameBuffer[pendingPage * 128U])) {
     pendingPage++;
+    pageRetry = 0U;
   } else {
-    pendingPage = 8U;
+    if (++pageRetry > 8U) {
+      pendingPage = 8U;
+      pageRetry = 0U;
+    }
   }
 }
 } // namespace
@@ -55,6 +62,7 @@ void SecondaryClock_Init() {
   lastFrameMs = 0U;
   wavePhase = 0U;
   pendingPage = 8U;
+  pageRetry = 0U;
   if (!oled.init()) {
     LOG_W("OLED", "SSD1315 not found at 0x3C/0x3D");
     return;

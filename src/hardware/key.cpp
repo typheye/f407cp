@@ -1,4 +1,5 @@
 #include "include/key.hpp"
+#include "core/manager/include/settings_manager.h"
 
 Switch::Switch(GPIO_TypeDef *port, uint16_t pin, bool inverted)
     : _port(port), _pin(pin), _inverted(inverted), _initialized(false) {}
@@ -211,7 +212,7 @@ uint8_t KeyManager::getGroup3Config(void) {
 }
 
 bool KeyManager::isSdCardInserted(void) { return _swSdDetect.isOn(); }
-bool KeyManager::isMuted(void) { return _swMute.isOn(); }
+bool KeyManager::isMuted(void) { return SM_SoundMute() || _swMute.isOn(); }
 bool KeyManager::isAnyCollision(void) {
   return _collisionA8.isPressed() || _collisionD0.isPressed();
 }

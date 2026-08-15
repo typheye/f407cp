@@ -34,10 +34,9 @@ uint32_t SysUI::_lastTick = 0;
 void (*SysUI::_currentTestFunc)(void) = nullptr;
 int SysUI::_cpuUsage = 0;
 
-#define TOS_ITEMS 5
+#define TOS_ITEMS 4
 static const char *tos_m[TOS_ITEMS] = {"00 Return", "01 Settings",
-                                       "02 File Manager", "03 HID Tools",
-                                       "04 Demo Activities"};
+                                       "02 File Manager", "03 Demo Activities"};
 
 static uint8_t g_dbg_overlay_enabled = 0;
 static uint32_t g_dbg_frame_count = 0;
@@ -179,8 +178,6 @@ void SysUI::loop(void) {
     } else if (sel == 2) {
       file_manager_run();
     } else if (sel == 3) {
-      hid_tools_run();
-    } else if (sel == 4) {
       demo_list_run();
     }
   } else if (_nowActivity == UI_RUNNING_TEST) {

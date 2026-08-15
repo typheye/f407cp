@@ -78,7 +78,8 @@ typedef struct __attribute__((packed, aligned(4))) {
   /* --- Hotspot settings --- */
   bool     hotspot_auto_close; /* auto-close after 5min idle */
   bool     boot_gfx;           /* boot sound/GFX on/off */
-  uint8_t  _pad2[2];           /* alignment */
+  bool     sound_mute;         /* mute system sounds */
+  uint8_t  _pad2[1];           /* alignment */
   char     hotspot_ip[16];     /* hotspot gateway IP, default 192.168.4.1 */
 
 } Settings_t;
@@ -86,7 +87,7 @@ typedef struct __attribute__((packed, aligned(4))) {
 /* ========== API ========== */
 
 void SM_Init(void);
-void SM_Mount(void);
+bool SM_Mount(void);
 void SM_Save(void);
 bool SM_SdAvailable(void);
 Settings_t *SM_Get(void);
@@ -143,6 +144,8 @@ void SM_Hotspot_SetPWD(const char *s);
 /* --- Sound & GFX --- */
 bool SM_BootGfx(void);
 void SM_SetBootGfx(bool v);
+bool SM_SoundMute(void);
+void SM_SetSoundMute(bool v);
 
 #ifdef __cplusplus
 }

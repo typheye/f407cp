@@ -49,11 +49,11 @@ void key_test_activity(void) {
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % KEY_N;
-      JPDelay(45);
+      JPDelay(8);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + KEY_N) % KEY_N;
-      JPDelay(45);
+      JPDelay(8);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -61,7 +61,7 @@ void key_test_activity(void) {
       return;
     le = ce;
 
-    if (HAL_GetTick() - lu > 16) {
+    if (HAL_GetTick() - lu > 1) {
       lu = HAL_GetTick();
 
       /* Read all states */

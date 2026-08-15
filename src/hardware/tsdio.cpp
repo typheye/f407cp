@@ -96,7 +96,7 @@ SDCard_Status_t TSDIO::init(void) {
   if (HAL_SD_Init(&hsd) != HAL_OK) {
     LOG_E("SDIO", "HAL_SD_Init FAILED");
     _hardDisabled = true;
-    LOG_E("SDIO", "SD card HARD DISABLED â€?init failed");
+    LOG_E("SDIO", "SD card HARD DISABLED ï¿½?init failed");
     return SD_CARD_ERROR;
   }
   LOG_I("SDIO", "HAL_SD_Init OK");
@@ -132,7 +132,7 @@ SDCard_Status_t TSDIO::init(void) {
             (unsigned long)hal_card_info.BlockNbr);
     LOG_E("SDIO", "Failed to get valid card info!");
     _hardDisabled = true;
-    LOG_E("SDIO", "SD card HARD DISABLED â€?invalid card info");
+    LOG_E("SDIO", "SD card HARD DISABLED ï¿½?invalid card info");
     return SD_CARD_ERROR;
   }
 
@@ -174,7 +174,7 @@ SDCard_Status_t TSDIO::init(void) {
   if (!waitForReady(5000)) {
     LOG_E("SDIO", "Card ready timeout");
     _hardDisabled = true;
-    LOG_E("SDIO", "SD card HARD DISABLED â€?not ready");
+    LOG_E("SDIO", "SD card HARD DISABLED ï¿½?not ready");
     return SD_CARD_NOT_READY;
   }
 
@@ -575,3 +575,14 @@ bool TSDIO::simpleWriteTest(void) {
 bool TSDIO_IsHardDisabled(void) { return boardSDIO.isHardDisabled(); }
 bool TSDIO_IsInitialized(void) { return boardSDIO.isInitialized(); }
 void TSDIO_MarkHardDisabled(void) { boardSDIO.markHardDisabled(); }
+
+extern "C" uint8_t BSP_SD_Init(void) {
+  if (boardSDIO.isInitialized()) {
+    return MSD_OK;
+  }
+  if (BSP_SD_IsDetected() != SD_PRESENT) {
+    return MSD_ERROR;
+  }
+  return HAL_SD_Init(&hsd) == HAL_OK ? MSD_OK : MSD_ERROR;
+}
+

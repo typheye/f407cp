@@ -28,21 +28,15 @@
 extern KeyManager keyManager;
 extern LCD boardLCD;
 
-#define DEMO_ITEMS 8
+#define DEMO_ITEMS 4
 static const char *demo_m[DEMO_ITEMS] = {
-    "00 Return",        "01 Key Test",       "03 I2C Scan",
-    "04 JY901S Sensor", "05 BMP180 Sensor",  "07 3D Path Tracer",
-    "09 TCS3472 Test",  "10 SN74HC00N Test",
+    "00 Return", "01 Key Test", "02 I2C Scan", "03 3D Path Tracer",
 };
 static void (*demo_f[DEMO_ITEMS])(void) = {
     NULL,
     key_test_activity,
     i2c_scan_activity,
-    jyro_activity,
-    bmp180_activity,
     render_3dox_activity_with_exit,
-    tcs3472_activity,
-    hc00n_activity,
 };
 
 // ============ Original TOS-style menu ============
