@@ -1,6 +1,10 @@
 #include "include/key.hpp"
 #include "core/manager/include/settings_manager.h"
 
+extern "C" bool TosApi_IsScreenSleeping(void);
+extern "C" bool TosApi_IsWakeKeySuppressed(void);
+extern "C" bool TosApi_IsWakeGuardActive(void);
+
 Switch::Switch(GPIO_TypeDef *port, uint16_t pin, bool inverted)
     : _port(port), _pin(pin), _inverted(inverted), _initialized(false) {}
 
@@ -60,6 +64,15 @@ bool Key::isReleased(void) { return !isPressed(); }
 KeyState_t Key::getState(void) {
   if (!_initialized)
     return KEY_IDLE;
+  if (TosApi_IsWakeGuardActive()) {
+    return KEY_IDLE;
+  }
+  if (TosApi_IsScreenSleeping() && this != &keyManager.spare) {
+    return KEY_IDLE;
+  }
+  if (this == &keyManager.spare && TosApi_IsWakeKeySuppressed()) {
+    return KEY_IDLE;
+  }
 
   tick();
   KeyState_t latched = _event;

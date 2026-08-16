@@ -34,8 +34,9 @@ void configureControlPins() {
 LCD boardLCD;
 
 LCD::LCD()
-    : _initialized(false), _autoBrightness(false), _rotation(0U),
-      _brightness(kDefaultBrightness), _tileY(0U),
+    : _initialized(false), _autoBrightness(false), _sleeping(false),
+      _rotation(0U), _brightness(kDefaultBrightness),
+      _sleep_restore_brightness(kDefaultBrightness), _tileY(0U),
       _tileH(TILE_HEIGHT) {}
 
 uint16_t LCD::rgb888ToRgb565(uint32_t color) const {
@@ -135,15 +136,21 @@ void LCD::setBrightness(uint16_t value) {
   if (value > 1000U)
     value = 1000U;
   _brightness = value;
+  if (!_sleeping) {
+    applyBrightness(value);
+  }
+
+  HAL_PWR_EnableBkUpAccess();
+  HAL_RTCEx_BKUPWrite(&hrtc, kBackupMagicRegister, kBrightnessMagic);
+  HAL_RTCEx_BKUPWrite(&hrtc, kBackupValueRegister, value);
+}
+
+void LCD::applyBrightness(uint16_t value) {
   (void)HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
   const uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim4) + 1U;
   const uint32_t compare =
       value >= 1000U ? period : (static_cast<uint32_t>(value) * period) / 1000U;
   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, compare);
-
-  HAL_PWR_EnableBkUpAccess();
-  HAL_RTCEx_BKUPWrite(&hrtc, kBackupMagicRegister, kBrightnessMagic);
-  HAL_RTCEx_BKUPWrite(&hrtc, kBackupValueRegister, value);
 }
 
 void LCD::adjustBrightness(int16_t delta) {
@@ -160,9 +167,24 @@ void LCD::setAutoBrightness(bool enabled) {
 }
 
 void LCD::setRotation(uint8_t rotation) {
-  /* Keep the validated software-compat rotation path. The original native
-   * rotation setting produced panel-window shifts on this board. */
+  /* Restore the stable 2-mode compatibility path. */
   _rotation = static_cast<uint8_t>(rotation & 0x01U);
+}
+
+void LCD::sleep() {
+  if (_sleeping)
+    return;
+  _sleep_restore_brightness = _brightness ? _brightness : kDefaultBrightness;
+  _sleeping = true;
+  applyBrightness(0U);
+}
+
+void LCD::wake() {
+  if (!_sleeping)
+    return;
+  _sleeping = false;
+  applyBrightness(_sleep_restore_brightness ? _sleep_restore_brightness
+                                            : kDefaultBrightness);
 }
 
 void LCD::updateAutoBrightness() {

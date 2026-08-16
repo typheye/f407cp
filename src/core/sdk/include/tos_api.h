@@ -10,6 +10,9 @@ extern "C" {
 void TosApi_Init(void);
 void TosApi_Tick(void);
 void TosApi_SetPaused(bool paused);
+bool TosApi_IsScreenSleeping(void);
+bool TosApi_IsWakeKeySuppressed(void);
+bool TosApi_IsWakeGuardActive(void);
 
 typedef struct {
   bool has_update;

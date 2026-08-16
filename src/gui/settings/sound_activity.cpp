@@ -41,10 +41,8 @@ void sound_activity_run(void) {
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       if (edit && sel == 1) {
         pending_mute = !pending_mute;
-        SM_SetSoundMute(pending_mute);
       } else if (edit && sel == 2) {
         pending_boot_gfx = !pending_boot_gfx;
-        SM_SetBootGfx(pending_boot_gfx);
       } else {
         sel = (sel + 1) % 3;
       }
@@ -54,10 +52,8 @@ void sound_activity_run(void) {
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       if (edit && sel == 1) {
         pending_mute = !pending_mute;
-        SM_SetSoundMute(pending_mute);
       } else if (edit && sel == 2) {
         pending_boot_gfx = !pending_boot_gfx;
-        SM_SetBootGfx(pending_boot_gfx);
       } else {
         sel = (sel - 1 + 3) % 3;
       }
@@ -67,6 +63,11 @@ void sound_activity_run(void) {
 
     if (keyManager._btnEnter.getState() == KEY_PRESSED) {
       if (edit) {
+        if (sel == 1) {
+          SM_SetSoundMute(pending_mute);
+        } else if (sel == 2) {
+          SM_SetBootGfx(pending_boot_gfx);
+        }
         edit = false;
       } else if (sel == 0) {
         return;

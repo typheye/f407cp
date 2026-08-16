@@ -35,14 +35,12 @@ extern LED whiteLed;
 
 static void led_test_activity(void);
 
-#define DEMO_ITEMS 5
+#define DEMO_ITEMS 4
 static const char *demo_m[DEMO_ITEMS] = {
-    "00 Return", "01 Key Test", "02 LED Test", "03 I2C Scan",
-    "04 3D Path Tracer",
+    "00 Return", "01 LED Test", "02 I2C Scan", "03 3D Path Tracer",
 };
 static void (*demo_f[DEMO_ITEMS])(void) = {
     NULL,
-    key_test_activity,
     led_test_activity,
     i2c_scan_activity,
     render_3dox_activity_with_exit,
@@ -81,51 +79,78 @@ static void led_test_activity(void) {
       "00 Return", "01 Red PF6", "02 Green PF7", "03 Blue PF8",
       "04 White PF9",
   };
-  bool on[4] = {false, false, false, false};
+  enum { LED_OFF = 0, LED_STAY = 1, LED_BLINK = 2 };
+  uint8_t mode[4] = {LED_OFF, LED_OFF, LED_OFF, LED_OFF};
   int sel = 0;
-  uint8_t last_enter = 0;
   uint32_t lu = 0;
+  bool editing = false;
+  int edit_field = 0;
   bool dirty = true;
 
   led_all_off();
   while (1) {
     TosApi_Tick();
-    keyManager.tick();
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
-      sel = (sel + 1) % 5;
+      if (editing) {
+        if (edit_field >= 1 && edit_field <= 4) {
+          mode[edit_field - 1] = (uint8_t)((mode[edit_field - 1] + 1U) % 3U);
+        }
+      } else {
+        sel = (sel + 1) % 5;
+      }
       dirty = true;
       JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
-      sel = (sel - 1 + 5) % 5;
+      if (editing) {
+        if (edit_field >= 1 && edit_field <= 4) {
+          mode[edit_field - 1] = (uint8_t)((mode[edit_field - 1] + 2U) % 3U);
+        }
+      } else {
+        sel = (sel - 1 + 5) % 5;
+      }
       dirty = true;
       JPDelay(2);
     }
 
-    uint8_t enter = keyManager._btnEnter.getState() == KEY_PRESSED;
-    if (enter && !last_enter) {
-      if (sel == 0) {
+    if (keyManager._btnEnter.getState() == KEY_PRESSED) {
+      if (editing) {
+        editing = false;
+        edit_field = 0;
+        dirty = true;
+      } else if (sel == 0) {
         led_all_off();
         return;
+      } else {
+        editing = true;
+        edit_field = sel;
+        dirty = true;
       }
-      on[sel - 1] = !on[sel - 1];
-      led_apply(on[0], on[1], on[2], on[3]);
-      dirty = true;
     }
-    last_enter = enter;
+
+    bool blink_on = ((HAL_GetTick() / 1000U) & 1U) != 0U;
+    led_apply(mode[0] == LED_STAY || (mode[0] == LED_BLINK && blink_on),
+              mode[1] == LED_STAY || (mode[1] == LED_BLINK && blink_on),
+              mode[2] == LED_STAY || (mode[2] == LED_BLINK && blink_on),
+              mode[3] == LED_STAY || (mode[3] == LED_BLINK && blink_on));
 
     if (dirty || (uint32_t)(HAL_GetTick() - lu) > 80U) {
       lu = HAL_GetTick();
       dirty = false;
+      const char *mode_names[] = {"OFF", "STAY", "BLINK"};
       LCD_FLUSH({
         UI_DrawFrameTitle("LED TEST");
         PD_SetFont(FONT_ASCII_16);
         UI_DrawMenuCard(0, sel, 33, labels[0]);
-        UI_DrawMenuBool(1, sel, 58, labels[1], on[0], false);
-        UI_DrawMenuBool(2, sel, 83, labels[2], on[1], false);
-        UI_DrawMenuBool(3, sel, 108, labels[3], on[2], false);
-        UI_DrawMenuBool(4, sel, 133, labels[4], on[3], false);
+        UI_DrawMenuValue(1, sel, 58, labels[1], mode_names[mode[0]],
+                         editing && edit_field == 1);
+        UI_DrawMenuValue(2, sel, 83, labels[2], mode_names[mode[1]],
+                         editing && edit_field == 2);
+        UI_DrawMenuValue(3, sel, 108, labels[3], mode_names[mode[2]],
+                         editing && edit_field == 3);
+        UI_DrawMenuValue(4, sel, 133, labels[4], mode_names[mode[3]],
+                         editing && edit_field == 4);
         PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
       });
     }

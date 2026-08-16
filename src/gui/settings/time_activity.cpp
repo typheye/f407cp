@@ -71,7 +71,6 @@ void time_activity_run(void) {
           keyManager._collisionD0.getState() == KEY_PRESSED) {
         if (edit_sel == 3) {
           style_24h = !style_24h;
-          SM_Time_SetStyle24h(style_24h);
         }
         dirty = true;
         JPDelay(2);
@@ -91,6 +90,9 @@ void time_activity_run(void) {
 
     if (keyManager._btnEnter.getState() == KEY_PRESSED) {
       if (editing) {
+        if (edit_sel == 3) {
+          SM_Time_SetStyle24h(style_24h);
+        }
         editing = false;
         edit_sel = -1;
       } else {

@@ -30,6 +30,8 @@
 static CCMRAM Settings_t g_settings;
 static bool g_sd_available = false;
 static bool g_settings_needs_migration = false;
+static bool g_have_saved_crc = false;
+static uint32_t g_last_saved_crc = 0U;
 
 static uint32_t settings_crc(const Settings_t *settings) {
   const uint8_t *bytes = (const uint8_t *)settings;
@@ -80,10 +82,13 @@ static void sanitize(void) {
   g_settings.hotspot_auto_close =
       g_settings.hotspot_auto_close ? true : false;
   g_settings.sound_mute = g_settings.sound_mute ? true : false;
+  if ((g_settings.disp_sleep_cfg & 0x0EU) > (5U << 1)) {
+    g_settings.disp_sleep_cfg = 0x04U;
+  }
   if (g_settings.disp_bright < 1U || g_settings.disp_bright > 10U) {
     g_settings.disp_bright = 10U;
   }
-  if (g_settings.disp_dir > 1U) {
+  if (g_settings.disp_dir > 3U) {
     g_settings.disp_dir = 0U;
   }
   for (uint8_t i = 0; i < SM_SAVED_MAX; ++i) {
@@ -124,6 +129,7 @@ static void defaults(void) {
   g_settings.hotspot_auto_close = true;
   g_settings.boot_gfx           = true;
   g_settings.sound_mute         = true;
+  g_settings.disp_sleep_cfg     = 0x04U; /* off, 1min default */
   copy_str(g_settings.hotspot_ip, "192.168.4.1", sizeof(g_settings.hotspot_ip));
   LOG_D("SMGR", "Defaults loaded");
 }
@@ -177,6 +183,10 @@ static bool load(void) {
   }
   g_settings.magic = SM_MAGIC;
   sanitize();
+  if (!g_settings_needs_migration) {
+    g_last_saved_crc = settings_crc(&g_settings);
+    g_have_saved_crc = true;
+  }
   LOG_I("SMGR", "Loaded from SD OK (%luB)", (unsigned long)br);
   return true;
 }
@@ -187,6 +197,8 @@ bool SM_SdAvailable(void) { return g_sd_available; }
 
 void SM_Init(void) {
   defaults();
+  g_have_saved_crc = false;
+  g_last_saved_crc = 0U;
 }
 
 void SM_Mount(void) {
@@ -233,12 +245,16 @@ void SM_Save(void) {
   FIL file;
   UINT bw;
   FRESULT res;
+  uint32_t start_ms = HAL_GetTick();
 
   /* Always attempt SD write; set available flag on success so
    * late-init or delayed-mount paths still persist settings.   */
   sanitize();
   g_settings.magic = SM_MAGIC;
   g_settings.crc = settings_crc(&g_settings);
+  if (g_sd_available && g_have_saved_crc && g_settings.crc == g_last_saved_crc) {
+    return;
+  }
   res = f_open(&file, "0:/data/settings.bin", FA_CREATE_ALWAYS | FA_WRITE);
   g_sd_available = false;
   if (res == FR_OK) {
@@ -247,6 +263,8 @@ void SM_Save(void) {
       res = f_sync(&file);
       if (res == FR_OK) {
         g_sd_available = true;
+        g_last_saved_crc = g_settings.crc;
+        g_have_saved_crc = true;
         LOG_I("SMGR", "Saved to SD OK (%luB)",
               (unsigned long)sizeof(g_settings));
       } else {
@@ -263,6 +281,13 @@ void SM_Save(void) {
     }
   } else {
     LOG_W("SMGR", "Save: open failed (%d)", (int)res);
+  }
+
+  {
+    uint32_t elapsed = HAL_GetTick() - start_ms;
+    if (elapsed > 150U) {
+      LOG_W("SMGR", "Save took %lums", (unsigned long)elapsed);
+    }
   }
 }
 
@@ -448,6 +473,28 @@ bool SM_SoundMute(void) { return g_settings.sound_mute; }
 void SM_SetSoundMute(bool v) {
   v = v ? true : false;
   if (g_settings.sound_mute != v) { g_settings.sound_mute = v; SM_Save(); }
+}
+
+static uint8_t disp_sleep_delay_idx(void) {
+  return (uint8_t)((g_settings.disp_sleep_cfg >> 1U) & 0x07U);
+}
+
+bool SM_Disp_AutoClose(void) { return (g_settings.disp_sleep_cfg & 0x01U) != 0U; }
+void SM_Disp_SetAutoClose(bool v) {
+  uint8_t next = (uint8_t)((disp_sleep_delay_idx() << 1U) | (v ? 1U : 0U));
+  if (g_settings.disp_sleep_cfg != next) {
+    g_settings.disp_sleep_cfg = next;
+    SM_Save();
+  }
+}
+uint8_t SM_Disp_CloseDelay(void) { return disp_sleep_delay_idx(); }
+void SM_Disp_SetCloseDelay(uint8_t v) {
+  if (v > 5U) v = 2U;
+  uint8_t next = (uint8_t)((v << 1U) | (g_settings.disp_sleep_cfg & 0x01U));
+  if (g_settings.disp_sleep_cfg != next) {
+    g_settings.disp_sleep_cfg = next;
+    SM_Save();
+  }
 }
 
 /* --- Status icon helpers (C-callable) --- */

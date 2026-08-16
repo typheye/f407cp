@@ -32,7 +32,6 @@
 #include "gui/demo/include/bmp_activity.hpp"
 #include "gui/demo/include/i2c_activity.hpp"
 #include "gui/demo/include/jyro_activity.hpp"
-#include "gui/demo/include/key_activity.hpp"
 #include "include/libpd.h"
 #include "gui/demo/include/sn74hc00n_activity.hpp"
 #include "gui/demo/include/tcs3472_activity.hpp"

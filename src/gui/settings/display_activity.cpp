@@ -28,24 +28,21 @@ extern KeyManager keyManager;
 extern LCD boardLCD;
 
 static int disp_bright = 10; // 1-10
-static int disp_dir = 0;
-static bool disp_edit = false;
-static int edit_field = 0;
-static bool disp_inited = false; // only apply defaults first time       //
-                                 // 1=bright, 2=direction
+static bool disp_inited = false; // only apply defaults first time
 
-static const char *dir_names[] = {"0", "90"};
+static const char *auto_close_names[] = {"OFF", "ON"};
+static const char *delay_names[] = {"15s", "30s", "1min", "2min", "5min", "10min"};
 
 static void apply(void) {
   boardLCD.setBrightness((uint16_t)disp_bright * 100);
-  boardLCD.setRotation((uint8_t)disp_dir);
 }
 
 static int item_count(void) {
-  return 4; // Return + Brightness + Direction + Resolution
+  return 5; // Return + Brightness + Resolution + AutoClose + Delay
 }
 
-static void draw_disp(int sel) {
+static void draw_disp(int sel, bool editing, int edit_field, bool auto_close,
+                      uint8_t sleep_delay) {
   LCD_FLUSH({
     UI_DrawFrameTitle("DISP");
     PD_SetFont(FONT_ASCII_16);
@@ -69,20 +66,23 @@ static void draw_disp(int sel) {
         snprintf(buf, sizeof(buf), "01 Brightness");
         char val[8];
         snprintf(val, sizeof(val), "%d%%", disp_bright * 10);
-        UI_DrawMenuValue(idx, sel, cy, buf, val,
-                         disp_edit && edit_field == 1);
+        UI_DrawMenuValue(idx, sel, cy, buf, val, editing && edit_field == 1);
         break;
       }
-      case 2: {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "02 Direction");
-        UI_DrawMenuValue(idx, sel, cy, buf, dir_names[disp_dir],
-                         disp_edit && edit_field == 2);
+      case 2:
+        UI_DrawMenuCard(idx, sel, cy, "02 Resolution  240x240");
+        break;
+      case 3: {
+        UI_DrawMenuValueEx(idx, sel, cy, "03 Auto Close",
+                           auto_close_names[auto_close ? 1 : 0],
+                           editing && edit_field == 3, false);
         break;
       }
-      case 3:
-        UI_DrawMenuCard(idx, sel, cy, "03 Resolution  240x240");
+      case 4: {
+        UI_DrawMenuValueEx(idx, sel, cy, "   Delay", delay_names[sleep_delay],
+                           editing && edit_field == 4, !auto_close);
         break;
+      }
       }
     }
     UI_DrawStdFooter();
@@ -94,14 +94,13 @@ static void draw_disp(int sel) {
 void display_activity_run(void) {
   if (!disp_inited) {
     disp_bright = SM_Disp_Bright();
-    disp_dir = SM_Disp_Dir();
     disp_inited = true;
   }
-  /* Always re-apply on entry */
-  boardLCD.setRotation((uint8_t)disp_dir);
   boardLCD.setBrightness((uint16_t)disp_bright * 100);
-  disp_edit = false;
-  edit_field = 0;
+  bool auto_close = SM_Disp_AutoClose();
+  uint8_t sleep_delay = SM_Disp_CloseDelay();
+  bool editing = false;
+  int edit_field = 0;
 
   int sel = 0;
   uint32_t lu = 0;
@@ -109,20 +108,17 @@ void display_activity_run(void) {
 
   while (1) {
     TosApi_Tick();
-    keyManager._collisionA8.tick();
-    keyManager._collisionD0.tick();
-    keyManager._btnEnter.tick();
-
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
-      if (disp_edit) {
+      if (editing) {
         if (edit_field == 1) {
           disp_bright++;
           if (disp_bright > 10)
             disp_bright = 10;
           apply(); /* live preview */
-        } else if (edit_field == 2) {
-          disp_dir = (disp_dir + 1) % 2;
-          apply();
+        } else if (edit_field == 3) {
+          auto_close = true;
+        } else if (edit_field == 4) {
+          sleep_delay = (uint8_t)((sleep_delay + 1U) % 6U);
         }
       } else {
         sel = (sel + 1) % item_count();
@@ -131,15 +127,16 @@ void display_activity_run(void) {
       JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
-      if (disp_edit) {
+      if (editing) {
         if (edit_field == 1) {
           disp_bright--;
           if (disp_bright < 1)
             disp_bright = 1;
           apply(); /* live preview */
-        } else if (edit_field == 2) {
-          disp_dir = (disp_dir - 1 + 2) % 2;
-          apply();
+        } else if (edit_field == 3) {
+          auto_close = false;
+        } else if (edit_field == 4) {
+          sleep_delay = (uint8_t)((sleep_delay + 5U) % 6U);
         }
       } else {
         sel = (sel - 1 + item_count()) % item_count();
@@ -149,26 +146,35 @@ void display_activity_run(void) {
     }
 
     if (keyManager._btnEnter.getState() == KEY_PRESSED) {
-      if (disp_edit) {
-        disp_edit = false;
+      if (editing) {
+        editing = false;
         edit_field = 0;
         Settings_t *s = SM_Get();
-        s->disp_bright = disp_bright;
-        s->disp_dir = disp_dir;
-        SM_Save(); /* single save after all changes */
-        boardLCD.setRotation((uint8_t)disp_dir);
+        uint8_t next_sleep_cfg =
+            (uint8_t)((sleep_delay << 1U) | (auto_close ? 1U : 0U));
+        if (s->disp_bright != (uint8_t)disp_bright ||
+            s->disp_sleep_cfg != next_sleep_cfg) {
+          s->disp_bright = (uint8_t)disp_bright;
+          s->disp_sleep_cfg = next_sleep_cfg;
+          SM_Save(); /* commit only when the value really changed */
+        }
         boardLCD.setBrightness((uint16_t)disp_bright * 100);
         dirty = true;
       } else {
-        if (sel == 0)
+        if (sel == 0) {
           return;
+        }
         if (sel == 1) {
-          disp_edit = true;
+          editing = true;
           edit_field = 1;
         }
-        if (sel == 2) {
-          disp_edit = true;
-          edit_field = 2;
+        if (sel == 3) {
+          editing = true;
+          edit_field = 3;
+        }
+        if (sel == 4 && auto_close) {
+          editing = true;
+          edit_field = 4;
         }
         dirty = true;
       }
@@ -176,7 +182,7 @@ void display_activity_run(void) {
     if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       dirty = false;
-      draw_disp(sel);
+      draw_disp(sel, editing, edit_field, auto_close, sleep_delay);
     }
     JPDelay(1);
   }
