@@ -29,12 +29,13 @@
 #define BUZZER1_PORT GPIOE
 #define BUZZER1_PIN GPIO_PIN_0
 
-
 class Buzzer {
 public:
   Buzzer(GPIO_TypeDef *port, uint16_t pin);
 
   void init();
+
+  bool isEnabled();
 
   void beep(uint32_t duration_ms);
 

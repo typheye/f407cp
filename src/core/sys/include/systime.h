@@ -25,6 +25,7 @@ extern "C" {
 bool SysTime_Sync(void);
 bool SysTime_SyncQuick(void);
 void SysTime_Fmt(char *buf, int sz, int h24, int m);
+void SysTime_FmtStyle(char *buf, int sz, int h24, int m, bool style_24h);
 
 #ifdef __cplusplus
 }

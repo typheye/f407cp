@@ -104,8 +104,8 @@ void time_activity_run(void) {
               int wk = (da + (mo <= 2 ? 1 : 0)) % 7;
               if (!wk)
                 wk = 7;
-              boardTRTC.setDate((uint8_t)(y - 2000), (uint8_t)mo,
-                                (uint8_t)da, (uint8_t)wk);
+              boardTRTC.setDate((uint8_t)(y - 2000), (uint8_t)mo, (uint8_t)da,
+                                (uint8_t)wk);
             }
           }
           break;
@@ -131,16 +131,16 @@ void time_activity_run(void) {
       boardTRTC.getDateTime(&t, &d);
       snprintf(date_buf, sizeof(date_buf), "%04d-%02d-%02d", 2000 + d.year,
                d.month, d.date);
-      snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d", t.hours,
-               t.minutes, t.seconds);
+      snprintf(time_buf, sizeof(time_buf), "%02d:%02d:%02d", t.hours, t.minutes,
+               t.seconds);
 
       LCD_FLUSH({
         UI_DrawFrameTitle("TIME");
         PD_SetFont(FONT_ASCII_16);
         UI_DrawMenuCardEx(0, sel, 33, "00 Return", false);
         UI_DrawMenuValueEx(1, sel, 58, "01 Date", date_buf, false, false);
-        UI_DrawMenuValueEx(2, sel, 83, "02 Time", time_buf, false, false);
-        UI_DrawMenuValueEx(3, sel, 108, "03 Style", style_24h ? "24H" : "12H",
+        UI_DrawMenuValueEx(2, sel, 83, "   Time", time_buf, false, false);
+        UI_DrawMenuValueEx(3, sel, 108, "02 Style", style_24h ? "24H" : "12H",
                            editing && edit_sel == 3, false);
         PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
       });
