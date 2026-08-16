@@ -87,7 +87,7 @@ typedef struct __attribute__((packed, aligned(4))) {
 /* ========== API ========== */
 
 void SM_Init(void);
-bool SM_Mount(void);
+void SM_Mount(void);
 void SM_Save(void);
 bool SM_SdAvailable(void);
 Settings_t *SM_Get(void);

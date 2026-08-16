@@ -149,6 +149,7 @@ int UI_MenuLoop(const char *title, const char **items, int count,
   }
   uint8_t last_enter = 0;
   uint32_t last_update = 0;
+  bool dirty = true;
 
   while (1) {
     TosApi_Tick();
@@ -158,11 +159,13 @@ int UI_MenuLoop(const char *title, const char **items, int count,
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % count;
-      JPDelay(8);
+      dirty = true;
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + count) % count;
-      JPDelay(8);
+      dirty = true;
+      JPDelay(2);
     }
 
     uint8_t enter = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -171,8 +174,9 @@ int UI_MenuLoop(const char *title, const char **items, int count,
     }
     last_enter = enter;
 
-    if ((uint32_t)(HAL_GetTick() - last_update) > 1U) {
+    if (dirty || (uint32_t)(HAL_GetTick() - last_update) > 80U) {
       last_update = HAL_GetTick();
+      dirty = false;
       UI_DrawSimpleMenu(title, items, count, sel);
     }
     TosApi_Tick();

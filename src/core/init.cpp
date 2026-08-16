@@ -28,6 +28,7 @@
 #include "hardware/include/cdc_bridge.h"
 #include "hardware/include/key.hpp"
 #include "hardware/include/lcd.hpp"
+#include "core/manager/include/file_manager.h"
 #include "hardware/include/sfhd.h"
 #include "hardware/include/secondary_clock.hpp"
 #include "hardware/include/tsdio.hpp"
@@ -42,13 +43,45 @@ extern "C" {}
 extern LED boardLed;
 extern Buzzer buzzer1;
 
-static void request_recovery_init(void) {
-  LOG_W("MAIN", "Requesting RECOVERY_INIT");
-  if (Flash_BL_SetBootTarget(FLASH_BL_BOOT_RECOVERY_INIT) == FLASH_OK) {
-    SysWatchdog_FeedNow();
-    NVIC_SystemReset();
-  } else {
+static void request_rec_init_if_needed(void) {
+  FRESULT mount_res;
+
+  if (TSDIO_IsHardDisabled() || !TSDIO_IsInitialized()) {
+    LOG_W("MAIN", "SD unavailable; skip REC INIT and continue boot");
+    return;
+  }
+
+  mount_res = FMCore_MountStorage(NULL, false);
+  if (mount_res == FR_NOT_READY) {
+    LOG_W("MAIN", "SD unavailable; skip REC INIT and continue boot");
+    return;
+  }
+  if (mount_res != FR_OK) {
+    LOG_W("MAIN", "SD storage probe failed: %s(%d)",
+          FMCore_FResultName(mount_res), (int)mount_res);
+    return;
+  }
+
+  if (FMCore_IsInitialized()) {
+    return;
+  }
+
+  LOG_W("MAIN", "SD storage is not initialized; entering REC INIT");
+  FMCore_Unmount();
+  if (!Flash_BL_RecoveryAvailable()) {
+    LOG_W("MAIN", "REC unavailable for init");
+    return;
+  }
+  SysWatchdog_FeedNow();
+  if (Flash_BL_SetBootTarget(FLASH_BL_BOOT_RECOVERY_INIT) != FLASH_OK) {
     LOG_E("MAIN", "Failed to set RECOVERY_INIT");
+    return;
+  }
+  __DSB();
+  __ISB();
+  NVIC_SystemReset();
+  while (1) {
+    __NOP();
   }
 }
 
@@ -76,13 +109,12 @@ void APP::init() {
   keyManager.init();
   SM_Init();
   if (boardSDIO.init() == SD_CARD_OK) {
-    if (!SM_Mount()) {
-      request_recovery_init();
-      return;
-    }
+    request_rec_init_if_needed();
+    SM_Mount();
   } else {
     LOG_W("SDIO", "SD card unavailable at boot");
   }
+  SysUI_DebugOverlaySetEnabled(SM_Debug_Dashboard() ? 1U : 0U);
   if (SM_BootGfx() && !SM_SoundMute()) {
     buzzer1.beepSuccess();
   }

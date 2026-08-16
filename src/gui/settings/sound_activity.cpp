@@ -34,6 +34,7 @@ void sound_activity_run(void) {
   bool edit = false;
   bool pending_boot_gfx = SM_BootGfx();
   bool pending_mute = SM_SoundMute();
+  bool dirty = true;
 
   while (1) {
     keyManager._collisionA8.tick(); keyManager._collisionD0.tick(); keyManager._btnEnter.tick();
@@ -47,6 +48,7 @@ void sound_activity_run(void) {
       } else {
         sel = (sel + 1) % 3;
       }
+      dirty = true;
       JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
@@ -59,6 +61,7 @@ void sound_activity_run(void) {
       } else {
         sel = (sel - 1 + 3) % 3;
       }
+      dirty = true;
       JPDelay(2);
     }
 
@@ -74,9 +77,11 @@ void sound_activity_run(void) {
         pending_boot_gfx = SM_BootGfx();
         edit = true;
       }
+      dirty = true;
     }
-    if (HAL_GetTick() - lu > 1) {
+    if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
+      dirty = false;
       LCD_FLUSH({
         UI_DrawFrameTitle("SOUND");
         PD_SetFont(FONT_ASCII_16);

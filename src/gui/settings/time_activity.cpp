@@ -59,6 +59,7 @@ void time_activity_run(void) {
 
   int sel = 0;
   uint32_t lu = 0;
+  bool dirty = true;
 
   while (1) {
     keyManager._collisionA8.tick();
@@ -72,15 +73,18 @@ void time_activity_run(void) {
           style_24h = !style_24h;
           SM_Time_SetStyle24h(style_24h);
         }
+        dirty = true;
         JPDelay(2);
       }
     } else {
       if (keyManager._collisionA8.getState() == KEY_PRESSED) {
         sel = (sel + 1) % 4;
+        dirty = true;
         JPDelay(2);
       }
       if (keyManager._collisionD0.getState() == KEY_PRESSED) {
         sel = (sel - 1 + 4) % 4;
+        dirty = true;
         JPDelay(2);
       }
     }
@@ -116,12 +120,14 @@ void time_activity_run(void) {
         case 3:
           editing = true;
           edit_sel = 3;
+          dirty = true;
           break;
         }
       }
     }
-    if (HAL_GetTick() - lu > 1) {
+    if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
+      dirty = false;
       boardTRTC.getDateTime(&t, &d);
       snprintf(date_buf, sizeof(date_buf), "%04d-%02d-%02d", 2000 + d.year,
                d.month, d.date);

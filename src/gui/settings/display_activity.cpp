@@ -105,6 +105,7 @@ void display_activity_run(void) {
 
   int sel = 0;
   uint32_t lu = 0;
+  bool dirty = true;
 
   while (1) {
     TosApi_Tick();
@@ -126,6 +127,7 @@ void display_activity_run(void) {
       } else {
         sel = (sel + 1) % item_count();
       }
+      dirty = true;
       JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
@@ -142,6 +144,7 @@ void display_activity_run(void) {
       } else {
         sel = (sel - 1 + item_count()) % item_count();
       }
+      dirty = true;
       JPDelay(2);
     }
 
@@ -155,6 +158,7 @@ void display_activity_run(void) {
         SM_Save(); /* single save after all changes */
         boardLCD.setRotation((uint8_t)disp_dir);
         boardLCD.setBrightness((uint16_t)disp_bright * 100);
+        dirty = true;
       } else {
         if (sel == 0)
           return;
@@ -166,10 +170,12 @@ void display_activity_run(void) {
           disp_edit = true;
           edit_field = 2;
         }
+        dirty = true;
       }
     }
-    if (HAL_GetTick() - lu > 1) {
+    if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
+      dirty = false;
       draw_disp(sel);
     }
     JPDelay(1);

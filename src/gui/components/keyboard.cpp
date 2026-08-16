@@ -173,6 +173,7 @@ bool keyboard_open(const char *title, char *out, int max_len) {
   uint8_t le = 0;
   uint32_t lu = 0;
   int last_pot = pot0;
+  bool dirty = true;
 
   while (1) {
     SysWatchdog_Tick();
@@ -189,18 +190,23 @@ bool keyboard_open(const char *title, char *out, int max_len) {
         pos = 0;
       if (pos >= total)
         pos = total - 1;
-      sel = pos;
+      if (sel != pos) {
+        sel = pos;
+        dirty = true;
+      }
     }
     last_pot = pot;
 
     // UP/DOWN fine
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % total;
-      JPDelay(8);
+      dirty = true;
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + total) % total;
-      JPDelay(8);
+      dirty = true;
+      JPDelay(2);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -224,10 +230,11 @@ bool keyboard_open(const char *title, char *out, int max_len) {
           if (ch != 0) {
             out[len++] = ch;
             out[len] = '\0';
+            dirty = true;
           }
         }
       }
-      JPDelay(8);
+      JPDelay(2);
     }
     le = ce;
 
@@ -248,11 +255,12 @@ bool keyboard_open(const char *title, char *out, int max_len) {
       ea = false;
     }
 
-    if (HAL_GetTick() - lu > 1) {
+    if (dirty || HAL_GetTick() - lu > 50U) {
       lu = HAL_GetTick();
+      dirty = false;
       draw_kb(out, len, sel, shift);
     }
     SysWatchdog_Tick();
-    JPDelay(15);
+    JPDelay(2);
   }
 }

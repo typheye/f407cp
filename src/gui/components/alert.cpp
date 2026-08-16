@@ -29,6 +29,7 @@ extern TRTC boardTRTC;
 
 void alert_show(const char *title, const char *msg) {
   uint32_t lu = 0;
+  bool dirty = true;
 
   while (1) {
     SysWatchdog_Tick();
@@ -37,8 +38,9 @@ void alert_show(const char *title, const char *msg) {
     if (keyManager._btnEnter.getState() == KEY_PRESSED)
       return;
 
-    if (HAL_GetTick() - lu > 1) {
+    if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
+      dirty = false;
 
       LCD_FLUSH({
         /* Update header time */

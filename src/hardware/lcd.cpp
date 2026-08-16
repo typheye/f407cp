@@ -5,6 +5,12 @@
 #include "library/include/libdly.h"
 #include "rtc.h"
 
+extern "C" void SysUI_DebugOverlayBeginFrame(void);
+extern "C" void SysUI_DebugOverlayEndFrame(void);
+extern "C" void SysUI_DebugOverlayDraw(void);
+
+static volatile uint8_t lcd_debug_overlay_suppressed = 0;
+
 namespace {
 constexpr uint16_t kDefaultBrightness = 700U;
 constexpr uint32_t kBrightnessMagic = 0x42524954U;
@@ -212,6 +218,9 @@ void LCD::beginTileRender(uint16_t y, uint16_t h) {
     h = static_cast<uint16_t>(LCD_HEIGHT - y);
   _tileY = y;
   _tileH = h;
+  if (y == 0U && !lcd_debug_overlay_suppressed) {
+    SysUI_DebugOverlayBeginFrame();
+  }
   PD_SetTileWindow(y, h);
   EMO_SetTileWindow(y, h);
   for (uint32_t i = 0U; i < static_cast<uint32_t>(LCD_WIDTH) * h; ++i)
@@ -222,6 +231,9 @@ void LCD::endTileRender() {
   if (!_initialized)
     return;
   const uint32_t pixels = static_cast<uint32_t>(LCD_WIDTH) * _tileH;
+  if (!lcd_debug_overlay_suppressed) {
+    SysUI_DebugOverlayDraw();
+  }
   for (uint32_t i = 0U; i < pixels; ++i) {
     const uint16_t value = tileBuffer[i];
     tileBuffer[i] = static_cast<uint16_t>((value << 8U) | (value >> 8U));
@@ -240,6 +252,9 @@ void LCD::endTileRender() {
   (void)HAL_SPI_Transmit(&hspi1, reinterpret_cast<uint8_t *>(tileBuffer),
                          static_cast<uint16_t>(pixels * 2U), 1000U);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11, GPIO_PIN_SET);
+  if ((_tileY + _tileH) >= LCD_HEIGHT && !lcd_debug_overlay_suppressed) {
+    SysUI_DebugOverlayEndFrame();
+  }
 }
 
 void LCD::flushTiled(void (*render_cb)(void)) {
@@ -281,7 +296,9 @@ void LCD_EmergencyPrepare(void) {
   }
 }
 void LCD_UpdateAutoBrightness(void) { boardLCD.updateAutoBrightness(); }
-void LCD_SetDebugOverlaySuppressed(uint8_t suppressed) { (void)suppressed; }
+void LCD_SetDebugOverlaySuppressed(uint8_t suppressed) {
+  lcd_debug_overlay_suppressed = suppressed ? 1U : 0U;
+}
 uint16_t LCD_RGB888ToRGB565(uint32_t color) { return boardLCD.rgb888ToRgb565(color); }
 uint16_t LCD_GetWidth(void) { return LCD_WIDTH; }
 uint16_t LCD_GetHeight(void) { return LCD_HEIGHT; }

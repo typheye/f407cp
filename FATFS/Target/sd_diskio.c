@@ -110,7 +110,53 @@ const Diskio_drvTypeDef  SD_Driver =
 };
 
 /* USER CODE BEGIN beforeFunctionSection */
-/* can be used to modify / undefine following code or add new code */
+/*
+ * TOS compatibility: FatFs metadata writes must not rely on the CubeMX DMA
+ * completion callback.  On this board that callback can be missed while
+ * creating directories or formatting, which otherwise stalls each write for
+ * the template's 30-second timeout and returns FR_DISK_ERR.
+ *
+ * Keep this in a USER CODE section so CubeMX regeneration preserves it.
+ */
+#include "core/sys/include/syslog.h"
+#include "core/sys/include/syswatchdog.h"
+
+#undef SD_TIMEOUT
+#define SD_TIMEOUT 3000U
+
+static uint8_t TOS_SD_WriteBlocksPolling(uint32_t *pData,
+                                         uint32_t write_addr,
+                                         uint32_t block_count)
+{
+  uint32_t start = HAL_GetTick();
+  uint8_t ret = BSP_SD_WriteBlocks(pData, write_addr, block_count,
+                                   SD_TIMEOUT);
+  if (ret != MSD_OK)
+  {
+    LOG_E("SDIO", "poll write failed: sector=%lu count=%lu ret=%u state=%u",
+          (unsigned long)write_addr, (unsigned long)block_count,
+          (unsigned)ret, (unsigned)BSP_SD_GetCardState());
+    return ret;
+  }
+
+  while ((HAL_GetTick() - start) < SD_TIMEOUT)
+  {
+    if (BSP_SD_GetCardState() == SD_TRANSFER_OK)
+    {
+      WriteStatus = 1U;
+      return MSD_OK;
+    }
+    SysWatchdog_Tick();
+  }
+
+  LOG_E("SDIO", "poll write state timeout: sector=%lu count=%lu state=%u",
+        (unsigned long)write_addr, (unsigned long)block_count,
+        (unsigned)BSP_SD_GetCardState());
+  return MSD_ERROR;
+}
+
+#define BSP_SD_WriteBlocks_DMA(pData, WriteAddr, NumOfBlocks) \
+  TOS_SD_WriteBlocksPolling((pData), (WriteAddr), (NumOfBlocks))
 /* USER CODE END beforeFunctionSection */
 
 /* Private functions ---------------------------------------------------------*/

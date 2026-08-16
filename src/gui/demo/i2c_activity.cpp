@@ -218,12 +218,12 @@ void i2c_scan_activity_gui(void) {
     /* UP (_collisionA8) */
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % n;
-      JPDelay(8);
+      JPDelay(2);
     }
     /* DOWN (_collisionD0) */
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + n) % n;
-      JPDelay(8);
+      JPDelay(2);
     }
 
     /* ENTER */
@@ -260,7 +260,7 @@ void i2c_scan_activity_gui(void) {
     }
 
     /* Redraw at ~10 fps */
-    if (HAL_GetTick() - lu > 1) {
+    if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       draw_results_page(sel);
     }

@@ -58,6 +58,7 @@ static void debug_page(void) {
   bool pending_log_com = SM_Debug_LogCom();
   uint8_t le = 0;
   uint32_t lu = 0;
+  bool dirty = true;
 
   while (1) {
     keyManager._collisionA8.tick();
@@ -72,6 +73,7 @@ static void debug_page(void) {
       } else {
         sel = (sel + 1) % 6;
       }
+      dirty = true;
       JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
@@ -82,6 +84,7 @@ static void debug_page(void) {
       } else {
         sel = (sel - 1 + 6) % 6;
       }
+      dirty = true;
       JPDelay(2);
     }
 
@@ -108,6 +111,7 @@ static void debug_page(void) {
         }
         lu = 0;
         editing = false;
+        dirty = true;
       } else
       if (!editing) {
         pending_dashboard = SM_Debug_Dashboard();
@@ -121,13 +125,15 @@ static void debug_page(void) {
         }
         SysUI_DebugOverlaySetEnabled(pending_dashboard ? 1U : 0U);
         editing = false;
+        dirty = true;
       }
       lu = 0;
     }
     le = ce;
 
-    if (HAL_GetTick() - lu > 1U) {
+    if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
+      dirty = false;
       LCD_FLUSH({
         UI_DrawFrameTitle("DEBUG");
         PD_SetFont(FONT_ASCII_16);

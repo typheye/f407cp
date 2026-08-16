@@ -22,6 +22,7 @@
 
 #include "include/syslog.h"
 #include "file_manager.h"
+#include "core/manager/include/settings_manager.h"
 
 extern RTC_HandleTypeDef hrtc;
 
@@ -168,7 +169,9 @@ static void syslog_emit_v(SysLog_Level_t level, const char *mod,
     line[len] = '\0';
   }
 
-  printf("%s", line);
+  if (SM_Debug_LogCom()) {
+    printf("%s", line);
+  }
 
   if (level <= SYSLOG_FILE_MAX_LEVEL && !g_syslog_file_guard &&
       !g_syslog_file_disabled) {

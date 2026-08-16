@@ -69,11 +69,11 @@ static int page_menu(const char *title, const char **items, int count,
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % count;
-      JPDelay(8);
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + count) % count;
-      JPDelay(8);
+      JPDelay(2);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -83,7 +83,7 @@ static int page_menu(const char *title, const char **items, int count,
     }
     le = ce;
 
-    if (HAL_GetTick() - lu > 1) {
+    if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       LCD_FLUSH({
         UI_DrawFrameTitle(title);

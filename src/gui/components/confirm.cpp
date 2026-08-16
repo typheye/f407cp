@@ -103,6 +103,7 @@ bool confirm_show(const char *title, const char *msg) {
   int sel = 0; /* 0=Yes, 1=No */
   uint8_t le = 0;
   uint32_t lu = 0;
+  bool dirty = true;
 
   while (1) {
     SysWatchdog_Tick();
@@ -113,11 +114,13 @@ bool confirm_show(const char *title, const char *msg) {
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % 2;
-      JPDelay(8);
+      dirty = true;
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + 2) % 2;
-      JPDelay(8);
+      dirty = true;
+      JPDelay(2);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -127,8 +130,9 @@ bool confirm_show(const char *title, const char *msg) {
     }
     le = ce;
 
-    if (HAL_GetTick() - lu > 1) {
+    if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
+      dirty = false;
       LCD_FLUSH({
         PD_Init();
         PD_FillScreen(TOS_BG);

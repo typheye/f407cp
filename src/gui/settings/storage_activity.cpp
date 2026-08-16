@@ -224,6 +224,7 @@ void storage_activity_run(void) {
   int sel = 0;
   uint8_t le = 0;
   uint32_t lu = 0;
+  bool dirty = true;
 
   while (1) {
     keyManager._collisionA8.tick();
@@ -231,10 +232,12 @@ void storage_activity_run(void) {
     keyManager._btnEnter.tick();
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % 2;
+      dirty = true;
       JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + 2) % 2;
+      dirty = true;
       JPDelay(2);
     }
 
@@ -253,14 +256,16 @@ void storage_activity_run(void) {
           PD_SetColor(TOS_TEXT);
           PD_DrawString(26, 33, "Refreshing...");
         });
-        JPDelay(8);
+        JPDelay(2);
         refresh();
         lu = 0;
+        dirty = true;
       }
     }
     le = ce;
-    if (HAL_GetTick() - lu > 1) {
+    if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
+      dirty = false;
       draw_storage(sel);
     }
     JPDelay(1);

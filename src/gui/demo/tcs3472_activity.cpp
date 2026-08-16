@@ -154,11 +154,11 @@ static void tcs3472_read_subpage(void) {
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % 7;
-      JPDelay(8);
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + 7) % 7;
-      JPDelay(8);
+      JPDelay(2);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -168,7 +168,7 @@ static void tcs3472_read_subpage(void) {
     }
     le = ce;
 
-    if (HAL_GetTick() - lu > 1) {
+    if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       TCS3472_RawData_t raw = boardTCS3472.readRaw();
       TCS3472_ColorData_t color = boardTCS3472.readColor();
@@ -236,7 +236,7 @@ static void tcs3472_color_subpage(void) {
       return;
     }
 
-    if (HAL_GetTick() - lu > 1) {
+    if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       TCS3472_RawData_t raw = boardTCS3472.readRaw();
 
@@ -320,7 +320,7 @@ static void tcs3472_cct_subpage(void) {
     if (keyManager._btnEnter.getState() == KEY_PRESSED)
       return;
 
-    if (HAL_GetTick() - lu > 1) {
+    if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       LCD_FLUSH({
         UI_DrawFrameTitle("DEMO");
@@ -409,7 +409,7 @@ static void tcs3472_chart_subpage(void) {
     TCS3472_RawData_t raw = boardTCS3472.readRaw();
     update_chart_data(raw.red, raw.green, raw.blue);
 
-    if (HAL_GetTick() - lu > 1) {
+    if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
 
       LCD_FLUSH({
@@ -490,11 +490,11 @@ void tcs3472_activity(void) {
 
     if (keyManager._collisionA8.getState() == KEY_PRESSED) {
       sel = (sel + 1) % TCS3472_N;
-      JPDelay(8);
+      JPDelay(2);
     }
     if (keyManager._collisionD0.getState() == KEY_PRESSED) {
       sel = (sel - 1 + TCS3472_N) % TCS3472_N;
-      JPDelay(8);
+      JPDelay(2);
     }
 
     uint8_t ce = (keyManager._btnEnter.getState() == KEY_PRESSED);
@@ -518,7 +518,7 @@ void tcs3472_activity(void) {
     }
     le = ce;
 
-    if (HAL_GetTick() - lu > 1) {
+    if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       LCD_FLUSH({
         UI_DrawFrameTitle("DEMO");

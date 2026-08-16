@@ -22,7 +22,6 @@
 
 #include "include/settings_manager.h"
 #include "ff.h"
-#include "fatfs.h"
 #include "library/include/libdly.h"
 #include <stddef.h>
 
@@ -129,15 +128,6 @@ static void defaults(void) {
   LOG_D("SMGR", "Defaults loaded");
 }
 
-static bool ensure_mounted(void) {
-  FRESULT res = f_mount(&SDFatFS, "0:", 1);
-  if (res != FR_OK) {
-    LOG_W("SMGR", "Mount failed (%d)", (int)res);
-    return false;
-  }
-  return true;
-}
-
 /* ========== Load from SD card ========== */
 static bool load(void) {
   FIL file;
@@ -199,14 +189,15 @@ void SM_Init(void) {
   defaults();
 }
 
-bool SM_Mount(void) {
+void SM_Mount(void) {
   FIL file;
   FRESULT res;
 
   g_sd_available = false;
-  if (!ensure_mounted()) {
-    LOG_W("SMGR", "SD not available");
-    return false;
+  res = f_mkdir("0:/data");
+  if (res != FR_OK && res != FR_EXIST) {
+    LOG_W("SMGR", "Cannot create data directory (%d)", (int)res);
+    return;
   }
 
   for (int retry = 0; retry < 3; ++retry) {
@@ -223,18 +214,19 @@ bool SM_Mount(void) {
   }
 
   if (!g_sd_available) {
-    LOG_W("SMGR", "Settings file unavailable");
-    return false;
+    res = f_open(&file, "0:/data/settings.bin", FA_CREATE_NEW);
+    if (res == FR_OK) { g_sd_available = true; f_close(&file); }
   }
+
+  if (!g_sd_available) { LOG_W("SMGR", "SD not available"); return; }
 
   if (!load()) {
     LOG_W("SMGR", "Load failed, using defaults");
-    return false;
+    SM_Save();
   } else if (g_settings_needs_migration) {
     g_settings_needs_migration = false;
     SM_Save();
   }
-  return true;
 }
 
 void SM_Save(void) {
@@ -247,11 +239,6 @@ void SM_Save(void) {
   sanitize();
   g_settings.magic = SM_MAGIC;
   g_settings.crc = settings_crc(&g_settings);
-  if (!g_sd_available && !ensure_mounted()) {
-    LOG_W("SMGR", "Save: mount failed");
-    return;
-  }
-  (void)f_mkdir("0:/data");
   res = f_open(&file, "0:/data/settings.bin", FA_CREATE_ALWAYS | FA_WRITE);
   g_sd_available = false;
   if (res == FR_OK) {
