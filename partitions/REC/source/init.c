@@ -46,9 +46,6 @@ static const char rec_title[] REC_CONST = "Recovery Mode";
 static const char rec_tdb_ready[] REC_CONST = "TDB was ready";
 static const char rec_tdb_hint[] REC_CONST = "Connect with computer";
 static const char rec_tdb_fail[] REC_CONST = "TDB USB init failed";
-static const char rec_format[] REC_CONST = "Formatting userdata...";
-static const char rec_format_done[] REC_CONST = "Format completed";
-static const char rec_format_fail[] REC_CONST = "Format failed";
 static const char rec_clock_fail[] REC_CONST = "Clock init failed";
 static const char rec_mounting[] REC_CONST = "Mounting SD...";
 static const char rec_upgrade_fail[] REC_CONST = "Upgrade failed";
@@ -120,7 +117,7 @@ static REC_CODE uint8_t rec_resolve_mode(uint8_t mode) {
   uint32_t target = SBL_StateConsumeBootTarget();
 
   if (target == SBL_BOOT_TARGET_RECOVERY_FORMAT)
-    return REC_MODE_FORMAT;
+    return REC_MODE_INIT;
   if (target == SBL_BOOT_TARGET_RECOVERY_UPGRADE)
     return REC_MODE_UPGRADE;
   if (target == SBL_BOOT_TARGET_RECOVERY_INIT)
@@ -128,9 +125,8 @@ static REC_CODE uint8_t rec_resolve_mode(uint8_t mode) {
   if (target == SBL_BOOT_TARGET_RECOVERY)
     return REC_MODE_WAIT;
 
-  if (mode != REC_MODE_WAIT && mode != REC_MODE_FORMAT &&
-      mode != REC_MODE_UPGRADE && mode != REC_MODE_CLOCK_ERROR &&
-      mode != REC_MODE_INIT)
+  if (mode != REC_MODE_WAIT && mode != REC_MODE_UPGRADE &&
+      mode != REC_MODE_CLOCK_ERROR && mode != REC_MODE_INIT)
     mode = REC_MODE_WAIT;
 
   /* Legacy command area is kept read-only compatible for already deployed
@@ -169,17 +165,6 @@ REC_CODE void REC_Run(uint8_t mode) {
   effective_mode = rec_resolve_mode(mode);
 
   switch (effective_mode) {
-  case REC_MODE_FORMAT:
-    rec_draw_full(rec_format, SBL_WHITE);
-    ok = REC_FatInitStorage();
-    error = ok ? 0 : REC_FatLastError();
-    REC_FatRelease();
-    rec_draw_status(ok ? rec_format_done : rec_format_fail,
-                    ok ? SBL_GREEN : SBL_RED);
-    rec_draw_detail(error, error ? SBL_RED : SBL_WHITE);
-    SBL_DelayMs(2000U);
-    SBL_SystemReboot();
-    return;
   case REC_MODE_INIT:
     rec_draw_full(rec_init, SBL_WHITE);
     ok = REC_FatInitStorage();

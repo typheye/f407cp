@@ -86,9 +86,9 @@ static const char rec_err_flash_verify[] REC_CONST = "Flash verify failed";
 static const char rec_err_format[] REC_CONST = "SD format failed";
 static const char rec_err_format_verify[] REC_CONST = "SD verify failed";
 static const char rec_err_layout[] REC_CONST = "Layout create failed";
-static const char rec_err_userdata[] REC_CONST = "Userdata erase failed";
+static const char rec_err_userdata[] REC_CONST = "SD format failed";
 static const char rec_err_userdata_verify[] REC_CONST =
-    "Userdata verify failed";
+    "SD verify failed";
 static const char rec_err_sync[] REC_CONST = "SD sync failed";
 static const char rec_path_init[] REC_CONST = "0:/init";
 static const char rec_path_manifest[] REC_CONST =
@@ -1027,37 +1027,9 @@ REC_CODE uint8_t REC_FatInitStorage(void) {
 }
 
 REC_CODE uint8_t REC_FatFormat(void) {
-  rec_copy_error(rec_err_none);
-
-  /* Factory reset is deliberately owned by REC.  SYSTEM only requests the
-   * RECOVERY_FORMAT boot target and resets; REC performs the destructive
-   * sector erase from its independent image and verifies every word before
-   * returning success. */
-#if TOS_DEV_SKIP_REAL_USERDATA_ERASE
-  SBL_FlashFlushCaches();
-  return 1U;
-#else
-  if (!SBL_FlashUnlock()) {
-    rec_copy_error(rec_err_userdata);
-    return 0U;
-  }
-  if (!SBL_FlashEraseSectorIndex(REC_USERDATA_SECTOR_INDEX)) {
-    SBL_FlashLock();
-    rec_copy_error(rec_err_userdata);
-    return 0U;
-  }
-  SBL_FlashLock();
-  SBL_FlashFlushCaches();
-
-  for (uint32_t addr = REC_USERDATA_START; addr < REC_USERDATA_END;
-       addr += sizeof(uint32_t)) {
-    if (*(const volatile uint32_t *)addr != 0xFFFFFFFFUL) {
-      rec_copy_error(rec_err_userdata_verify);
-      return 0U;
-    }
-  }
-  return 1U;
-#endif
+  /* Compatibility entry point: the real factory reset now formats the SD card
+   * and rebuilds the REC layout. */
+  return REC_FatInitStorage();
 }
 
 REC_CODE void REC_FatRelease(void) {

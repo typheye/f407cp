@@ -8,6 +8,7 @@
 #include "hardware/include/secondary_clock.hpp"
 
 namespace {
+bool api_initialized;
 bool paused;
 bool screen_sleeping;
 bool wake_key_suppressed;
@@ -72,6 +73,7 @@ static bool power_key_pressed_edge(uint32_t now, bool raw_down) {
 }
 
 void TosApi_Init(void) {
+  api_initialized = true;
   paused = false;
   screen_sleeping = false;
   wake_key_suppressed = false;
@@ -103,6 +105,10 @@ bool TosApi_CheckUpgrade(TosUpgradeInfo *info) {
 }
 
 void TosApi_Tick(void) {
+  if (!api_initialized) {
+    SysWatchdog_Tick();
+    return;
+  }
   keyManager.tick();
   CDC_Bridge_Tick();
   SecondaryClock_Tick();

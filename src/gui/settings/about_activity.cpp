@@ -200,7 +200,7 @@ void about_activity_run(void) {
       {"   Running", running_value},
       {"03 Update System", ""},
       {"   Reboot Device", ""},
-      {"   Restore to Default", ""},
+      {"   Restore SD Card", ""},
   };
 
   int sel = 0;
@@ -281,15 +281,15 @@ void about_activity_run(void) {
           NVIC_SystemReset();
         }
         break;
-      case 11: /* Restore to Default */
-        if (confirm_show("RST", "Erase all settings?\nDevice will reboot.")) {
-          /* Destructive USERDATA erase belongs to the independent REC image,
-           * not to SYSTEM.  Persist the one-shot target in TEE and reset; REC
-           * will erase and verify sector 11, then reboot into clean defaults. */
+      case 11: /* Restore SD Card */
+        if (confirm_show("RST", "Format SD card?\nDevice will reboot.")) {
+          /* Factory reset is owned by REC. SYSTEM only requests the
+           * RECOVERY_FORMAT boot target and resets; REC formats the SD card,
+           * rebuilds its layout, then reboots into clean defaults. */
           if (!Flash_BL_RecoveryAvailable()) {
             alert_show("RST", "Recovery is unavailable.");
           } else if (Flash_BL_SetBootTarget(
-                         FLASH_BL_BOOT_RECOVERY_FORMAT) == FLASH_OK) {
+                         FLASH_BL_BOOT_RECOVERY_INIT) == FLASH_OK) {
             NVIC_SystemReset();
           } else {
             alert_show("RST", "Failed to enter recovery.");

@@ -61,8 +61,7 @@ typedef enum {
  * BMP   – BMP180 pressure           JYRO  – JY901S gyro
  * POT   – potentiometer             HC00  – SN74HC00N logic
  * KEY   – key manager               LED   – LED driver
- * BUZZ  – buzzer                    WLAN  – WiFi settings
- * HOTS  – hotspot settings          DSPL  – display settings
+ * BUZZ  – buzzer                    DSPL  – display settings
  * SND   – sound settings            STOR  – storage settings
  * PET   – launcher / pet            EHW   – expression hardware
  * PD    – libpd display library     KB    – keyboard

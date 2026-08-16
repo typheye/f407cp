@@ -14,15 +14,17 @@
 #include "hardware/include/trtc.hpp"
 #include "include/libdly.h"
 #include "include/libpd.h"
-#include "gui/components/include/status_icons.h"
+#include "gui/components/include/icons.h"
 
 extern TRTC boardTRTC;
 extern KeyManager keyManager;
 
-extern "C" bool wlan_is_on(void);
-extern "C" bool wlan_is_connected(void);
-extern "C" bool hotspot_is_active(void);
 extern "C" void LCD_SetDebugOverlaySuppressed(uint8_t suppressed);
+
+static void draw_ico_pixel(int x, int y, void *) {
+  PD_SetColor(TOS_ACCENT);
+  PD_DrawPixel((int16_t)x, (int16_t)y);
+}
 
 void UI_DrawFrameTitle(const char *title) {
   PD_Init();
@@ -46,9 +48,7 @@ void UI_DrawFrameTitle(const char *title) {
 }
 
 void UI_DrawFrameStatusIcons(void) {
-  draw_icon_ico();
-  status_icons_draw(wlan_is_on(), wlan_is_connected(),
-                    hotspot_is_active());
+  icon_draw_bitmap_msb(&ICON_ICO, 0, 0, draw_ico_pixel, nullptr);
 }
 
 void UI_DrawMenuCardEx(int idx, int sel, int cy, const char *text, bool grey) {
