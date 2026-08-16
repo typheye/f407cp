@@ -114,7 +114,6 @@ void APP::init() {
   } else {
     LOG_W("SDIO", "SD card unavailable at boot");
   }
-  SysUI_DebugOverlaySetEnabled(SM_Debug_Dashboard() ? 1U : 0U);
   if (SM_BootGfx() && !SM_SoundMute()) {
     buzzer1.beepSuccess();
   }
@@ -136,6 +135,7 @@ void APP::init() {
   /* ELF left the secondary panel off and cleared. Enable it only after the
    * complete SYSTEM UI and primary display stack are ready. */
   SecondaryClock_Init();
+  SysUI_DebugOverlaySetEnabled(SM_Debug_Dashboard() ? 1U : 0U);
 
   SysUI::setActivity(UI_PET);
 }

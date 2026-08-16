@@ -1,5 +1,6 @@
 #include "include/tos_api.h"
 
+#include "core/manager/include/settings_manager.h"
 #include "core/sys/include/syswatchdog.h"
 #include "hardware/include/cdc_bridge.h"
 #include "hardware/include/key.hpp"
@@ -28,6 +29,10 @@ void TosApi_Tick(void) {
   keyManager.tick();
   CDC_Bridge_Tick();
   SecondaryClock_Tick();
+  if (!keyManager.up.isPressed() && !keyManager.down.isPressed() &&
+      !keyManager.confirm.isPressed() && !keyManager.spare.isPressed()) {
+    SM_Tick();
+  }
   SysWatchdog_Tick();
   (void)paused;
 }

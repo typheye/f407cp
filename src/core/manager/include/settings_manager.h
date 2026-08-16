@@ -89,6 +89,8 @@ typedef struct __attribute__((packed, aligned(4))) {
 void SM_Init(void);
 void SM_Mount(void);
 void SM_Save(void);
+void SM_SaveNow(void);
+void SM_Tick(void);
 bool SM_SdAvailable(void);
 Settings_t *SM_Get(void);
 

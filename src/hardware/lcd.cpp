@@ -8,6 +8,7 @@
 extern "C" void SysUI_DebugOverlayBeginFrame(void);
 extern "C" void SysUI_DebugOverlayEndFrame(void);
 extern "C" void SysUI_DebugOverlayDraw(void);
+extern void lcd_dma_yield(void);
 
 static volatile uint8_t lcd_debug_overlay_suppressed = 0;
 
@@ -249,8 +250,22 @@ void LCD::endTileRender() {
              static_cast<uint16_t>(_tileY + _tileH - 1U));
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11, GPIO_PIN_RESET);
-  (void)HAL_SPI_Transmit(&hspi1, reinterpret_cast<uint8_t *>(tileBuffer),
-                         static_cast<uint16_t>(pixels * 2U), 1000U);
+  HAL_StatusTypeDef st = HAL_SPI_Transmit_DMA(
+      &hspi1, reinterpret_cast<uint8_t *>(tileBuffer),
+      static_cast<uint16_t>(pixels * 2U));
+  if (st == HAL_OK) {
+    uint32_t timeout = HAL_GetTick() + 120U;
+    while (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY) {
+      if ((int32_t)(HAL_GetTick() - timeout) >= 0) {
+        (void)HAL_SPI_Abort(&hspi1);
+        break;
+      }
+      lcd_dma_yield();
+    }
+  } else {
+    (void)HAL_SPI_Transmit(&hspi1, reinterpret_cast<uint8_t *>(tileBuffer),
+                           static_cast<uint16_t>(pixels * 2U), 1000U);
+  }
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11, GPIO_PIN_SET);
   if ((_tileY + _tileH) >= LCD_HEIGHT && !lcd_debug_overlay_suppressed) {
     SysUI_DebugOverlayEndFrame();
