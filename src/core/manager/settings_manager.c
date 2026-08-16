@@ -30,11 +30,6 @@
 static CCMRAM Settings_t g_settings;
 static bool g_sd_available = false;
 static bool g_settings_needs_migration = false;
-static volatile bool g_save_pending = false;
-static volatile bool g_save_in_progress = false;
-static uint32_t g_save_due_ms = 0;
-
-#define SM_SAVE_DEFER_MS 700U
 
 static uint32_t settings_crc(const Settings_t *settings) {
   const uint8_t *bytes = (const uint8_t *)settings;
@@ -227,29 +222,17 @@ void SM_Mount(void) {
 
   if (!load()) {
     LOG_W("SMGR", "Load failed, using defaults");
-    SM_SaveNow();
+    SM_Save();
   } else if (g_settings_needs_migration) {
     g_settings_needs_migration = false;
-    SM_SaveNow();
+    SM_Save();
   }
 }
 
 void SM_Save(void) {
-  g_save_pending = true;
-  g_save_due_ms = HAL_GetTick() + SM_SAVE_DEFER_MS;
-}
-
-void SM_SaveNow(void) {
   FIL file;
   UINT bw;
   FRESULT res;
-
-  if (g_save_in_progress) {
-    return;
-  }
-
-  g_save_in_progress = true;
-  g_save_pending = false;
 
   /* Always attempt SD write; set available flag on success so
    * late-init or delayed-mount paths still persist settings.   */
@@ -264,7 +247,7 @@ void SM_SaveNow(void) {
       res = f_sync(&file);
       if (res == FR_OK) {
         g_sd_available = true;
-        LOG_D("SMGR", "Saved to SD OK (%luB)",
+        LOG_I("SMGR", "Saved to SD OK (%luB)",
               (unsigned long)sizeof(g_settings));
       } else {
         LOG_E("SMGR", "Save: sync failed (%d)", (int)res);
@@ -280,17 +263,6 @@ void SM_SaveNow(void) {
     }
   } else {
     LOG_W("SMGR", "Save: open failed (%d)", (int)res);
-  }
-
-  g_save_in_progress = false;
-}
-
-void SM_Tick(void) {
-  if (!g_save_pending || g_save_in_progress) {
-    return;
-  }
-  if ((int32_t)(HAL_GetTick() - g_save_due_ms) >= 0) {
-    SM_SaveNow();
   }
 }
 
