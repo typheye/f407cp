@@ -101,6 +101,8 @@ void SysLog_Print(SysLog_Level_t level, const char *mod, const char *fmt, ...);
 void SysLog_WriteFatalDump(uint32_t code, const char *name);
 void SysLog_DisableFileOutput(void);
 bool SysLog_IsFileOutputDisabled(void);
+uint32_t SysLog_OledSnapshot(char lines[][32], uint32_t max_lines);
+uint32_t SysLog_OledSequence(void);
 
 /**
  * @brief  Get the millisecond tick used for timestamps

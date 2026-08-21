@@ -3,41 +3,26 @@
 #include "include/ssd1315.hpp"
 #include "core/sys/include/syslog.h"
 #include "library/include/liboledgfx.h"
-#include "rtc.h"
+#include <cstdio>
+#include <cstring>
 
 namespace {
 uint8_t frameBuffer[LIBOLEDGFX_BUFFER_SIZE];
-uint8_t lastSecond = 0xFFU;
 uint32_t lastFrameMs = 0U;
-uint8_t wavePhase = 0U;
+uint32_t lastSeenSeq = 0U;
+uint32_t lastForceRefreshMs = 0U;
 uint8_t pendingPage = 8U;
 uint8_t pageRetry = 0U;
-bool running;
+bool running = false;
 
-const char *weekdayName(uint8_t weekday) {
-  static const char *const names[] = {"---", "MON", "TUE", "WED",
-                                      "THU", "FRI", "SAT", "SUN"};
-  return names[weekday <= 7U ? weekday : 0U];
+bool displayFullBlocking() {
+  return oled.display(frameBuffer, sizeof(frameBuffer));
 }
 
-bool compose(uint8_t phase) {
-  RTC_TimeTypeDef time{};
-  RTC_DateTypeDef date{};
-  if (HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN) != HAL_OK ||
-      HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN) != HAL_OK)
-    return false;
-  LibOledGfx_DrawDigitalClockWave(
-      frameBuffer, static_cast<uint16_t>(2000U + date.Year), date.Month,
-      date.Date, weekdayName(date.WeekDay), time.Hours, time.Minutes,
-      time.Seconds, phase);
-  lastSecond = time.Seconds;
-  lastFrameMs = HAL_GetTick();
-  return true;
+void startPagedRefresh() {
+  pendingPage = 0U;
+  pageRetry = 0U;
 }
-
-bool displayFullBlocking() { return oled.display(frameBuffer, sizeof(frameBuffer)); }
-
-void startPagedRefresh() { pendingPage = 0U; }
 
 void servicePagedRefresh() {
   if (pendingPage >= 8U)
@@ -47,51 +32,71 @@ void servicePagedRefresh() {
   if (oled.displayPageDma(pendingPage, &frameBuffer[pendingPage * 128U])) {
     pendingPage++;
     pageRetry = 0U;
-  } else {
-    if (++pageRetry > 8U) {
-      pendingPage = 8U;
-      pageRetry = 0U;
-    }
+  } else if (++pageRetry > 8U) {
+    pendingPage = 8U;
+    pageRetry = 0U;
+  }
+}
+
+void drawLogScreen(uint32_t seq) {
+  (void)seq;
+  char lines[9][32];
+  uint32_t count = SysLog_OledSnapshot(lines, 9U);
+
+  LibOledGfx_Clear(frameBuffer, 0U);
+
+  uint32_t first = count > 9U ? count - 9U : 0U;
+  for (uint32_t i = first; i < count; ++i) {
+    uint8_t y = static_cast<uint8_t>((i - first) * 7U);
+    LibOledGfx_DrawText3x5(frameBuffer, 0U, y, lines[i]);
   }
 }
 } // namespace
 
 void SecondaryClock_Init() {
   running = false;
-  lastSecond = 0xFFU;
   lastFrameMs = 0U;
-  wavePhase = 0U;
+  lastSeenSeq = 0U;
+  lastForceRefreshMs = 0U;
   pendingPage = 8U;
   pageRetry = 0U;
+
   if (!oled.init()) {
     LOG_W("OLED", "SSD1315 not found at 0x3C/0x3D");
     return;
   }
 
   LibOledGfx_Clear(frameBuffer, 0U);
-  if (!oled.display(frameBuffer, sizeof(frameBuffer)) || !compose(wavePhase) ||
-      !displayFullBlocking() ||
-      !oled.setDisplayOn(true)) {
-    (void)oled.setDisplayOn(false);
-    LOG_W("OLED", "SSD1315 clock initialization failed");
-    return;
-  }
+  (void)oled.display(frameBuffer, sizeof(frameBuffer));
   running = true;
-  LOG_I("OLED", "SSD1315 clock ready at 0x%02X", oled.address());
+  LOG_I("OLED", "SSD1315 log display ready at 0x%02X", oled.address());
+  lastSeenSeq = SysLog_OledSequence();
+  drawLogScreen(lastSeenSeq);
+  (void)displayFullBlocking();
+  (void)oled.setDisplayOn(true);
+  startPagedRefresh();
 }
 
 void SecondaryClock_Tick() {
   if (!running)
     return;
+
   servicePagedRefresh();
   if (pendingPage < 8U)
     return;
 
   uint32_t now = HAL_GetTick();
-  if ((uint32_t)(now - lastFrameMs) < 250U)
+  if ((uint32_t)(now - lastFrameMs) < 150U)
     return;
+  lastFrameMs = now;
 
-  wavePhase = static_cast<uint8_t>((wavePhase + 1U) & 0x0FU);
-  if (compose(wavePhase))
-    startPagedRefresh();
+  uint32_t seq = SysLog_OledSequence();
+  bool changed = seq != lastSeenSeq;
+  bool force = (uint32_t)(now - lastForceRefreshMs) >= 1000U;
+  if (!changed && !force)
+    return;
+  lastSeenSeq = seq;
+  lastForceRefreshMs = now;
+  drawLogScreen(seq);
+  startPagedRefresh();
 }

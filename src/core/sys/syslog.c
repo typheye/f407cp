@@ -30,6 +30,11 @@ static uint8_t g_syslog_file_guard = 0;
 static uint8_t g_syslog_file_disabled = 0;
 static uint8_t g_syslog_file_failures = 0;
 
+#define SYSLOG_OLED_LINES 9U
+#define SYSLOG_OLED_COLS  32U
+static char g_oled_lines[SYSLOG_OLED_LINES][SYSLOG_OLED_COLS];
+static uint32_t g_oled_seq = 0U;
+
 static const char *syslog_level_name(SysLog_Level_t level) {
   switch (level) {
   case SYSLOG_FATAL:
@@ -45,6 +50,66 @@ static const char *syslog_level_name(SysLog_Level_t level) {
   default:
     return "LOG  ";
   }
+}
+
+static char syslog_level_letter(SysLog_Level_t level) {
+  switch (level) {
+  case SYSLOG_FATAL: return 'F';
+  case SYSLOG_ERROR: return 'E';
+  case SYSLOG_WARN:  return 'W';
+  case SYSLOG_INFO:  return 'I';
+  case SYSLOG_DEBUG: return 'D';
+  default: return '?';
+  }
+}
+
+static void syslog_oled_push(SysLog_Level_t level, const char *mod,
+                             const char *msg) {
+  char compact[SYSLOG_OLED_COLS];
+  char clean[224];
+  const char *m = msg ? msg : "";
+  size_t clean_len = 0U;
+  size_t pos = 0U;
+
+  /*
+   * The OLED is a single-line log tail.  Flatten CR/LF/TAB and all other
+   * control bytes here, before the line reaches the renderer.  This also
+   * prevents a multi-line printf message from corrupting the OLED layout.
+   */
+  while (*m != '\0' && clean_len < sizeof(clean) - 1U) {
+    unsigned char ch = (unsigned char)*m++;
+    if (ch < 0x20U || ch == 0x7FU) {
+      clean[clean_len++] = ' ';
+    } else {
+      clean[clean_len++] = (char)ch;
+    }
+  }
+  clean[clean_len] = '\0';
+  if (clean_len > 24U) {
+    memmove(clean, clean + clean_len - 24U, 24U);
+    clean[24U] = '\0';
+  }
+
+  memset(compact, ' ', sizeof(compact));
+  compact[sizeof(compact) - 1U] = '\0';
+
+  compact[pos++] = syslog_level_letter(level);
+  compact[pos++] = ' ';
+  if (mod) {
+    for (uint8_t i = 0U; i < 5U && mod[i] != '\0' && pos < sizeof(compact) - 1U;
+         ++i) {
+      compact[pos++] = mod[i];
+    }
+  }
+  compact[pos++] = ' ';
+  for (uint8_t i = 0U; clean[i] != '\0' && pos < sizeof(compact) - 1U; ++i) {
+    compact[pos++] = clean[i];
+  }
+  compact[pos] = '\0';
+  strncpy(g_oled_lines[g_oled_seq % SYSLOG_OLED_LINES], compact,
+          SYSLOG_OLED_COLS - 1U);
+  g_oled_lines[g_oled_seq % SYSLOG_OLED_LINES][SYSLOG_OLED_COLS - 1U] = '\0';
+  g_oled_seq++;
 }
 
 /* Hand-rolled uint32→dec (avoids newlib-nano snprintf issues) */
@@ -169,6 +234,8 @@ static void syslog_emit_v(SysLog_Level_t level, const char *mod,
     line[len] = '\0';
   }
 
+  syslog_oled_push(level, mod, msg);
+
   if (SM_Debug_LogCom()) {
     printf("%s", line);
   }
@@ -182,6 +249,22 @@ static void syslog_emit_v(SysLog_Level_t level, const char *mod,
     syslog_handle_file_result(res);
   }
 }
+
+uint32_t SysLog_OledSnapshot(char lines[][32], uint32_t max_lines) {
+  if (!lines || max_lines == 0U) return 0U;
+  uint32_t available = g_oled_seq < SYSLOG_OLED_LINES ? g_oled_seq
+                                                      : SYSLOG_OLED_LINES;
+  uint32_t count = available < max_lines ? available : max_lines;
+  uint32_t start = g_oled_seq - count;
+  for (uint32_t i = 0U; i < count; ++i) {
+    uint32_t idx = (start + i) % SYSLOG_OLED_LINES;
+    strncpy(lines[i], g_oled_lines[idx], SYSLOG_OLED_COLS - 1U);
+    lines[i][SYSLOG_OLED_COLS - 1U] = '\0';
+  }
+  return count;
+}
+
+uint32_t SysLog_OledSequence(void) { return g_oled_seq; }
 
 void SysLog_Print(SysLog_Level_t level, const char *mod, const char *fmt, ...) {
   va_list ap;

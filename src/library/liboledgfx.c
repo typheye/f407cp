@@ -92,6 +92,53 @@ void LibOledGfx_DrawText5x7(uint8_t *buffer, uint8_t x, uint8_t y,
   }
 }
 
+static const uint8_t *glyph3x5(char ch) {
+  static const uint8_t blank[5] = {0, 0, 0, 0, 0};
+  static const uint8_t colon[5] = {0, 2, 0, 2, 0};
+  static const uint8_t dash[5] = {0, 0, 7, 0, 0};
+  static const uint8_t dot[5] = {0, 0, 0, 0, 2};
+  static const uint8_t slash[5] = {1, 1, 2, 4, 4};
+  static const uint8_t underscore[5] = {0, 0, 0, 0, 7};
+  static const uint8_t digits[10][5] = {
+      {7,5,5,5,7}, {2,6,2,2,7}, {7,1,7,4,7}, {7,1,7,1,7},
+      {5,5,7,1,1}, {7,4,7,1,7}, {7,4,7,5,7}, {7,1,1,1,1},
+      {7,5,7,5,7}, {7,5,7,1,7}};
+  static const uint8_t letters[26][5] = {
+      {7,5,7,5,5}, {6,5,6,5,6}, {7,4,4,4,7}, {6,5,5,5,6},
+      {7,4,6,4,7}, {7,4,6,4,4}, {7,4,5,5,7}, {5,5,7,5,5},
+      {7,2,2,2,7}, {1,1,1,5,7}, {5,5,6,5,5}, {4,4,4,4,7},
+      {5,7,7,5,5}, {5,7,7,7,5}, {7,5,5,5,7}, {7,5,7,4,4},
+      {7,5,5,7,1}, {7,5,7,6,5}, {7,4,7,1,7}, {7,2,2,2,2},
+      {5,5,5,5,7}, {5,5,5,5,2}, {5,5,7,7,5}, {5,5,2,5,5},
+      {5,5,7,2,2}, {7,1,2,4,7}};
+  if (ch >= '0' && ch <= '9') return digits[ch - '0'];
+  if (ch >= 'a' && ch <= 'z') ch = (char)(ch - 'a' + 'A');
+  if (ch >= 'A' && ch <= 'Z') return letters[ch - 'A'];
+  if (ch == ':') return colon;
+  if (ch == '-') return dash;
+  if (ch == '.') return dot;
+  if (ch == '/') return slash;
+  if (ch == '_') return underscore;
+  return blank;
+}
+
+void LibOledGfx_DrawText3x5(uint8_t *buffer, uint8_t x, uint8_t y,
+                           const char *text) {
+  if (buffer == 0 || text == 0) return;
+  while (*text != '\0' && x < LIBOLEDGFX_WIDTH) {
+    const uint8_t *glyph = glyph3x5(*text++);
+    for (uint8_t gy = 0U; gy < 5U; ++gy) {
+      uint8_t row = glyph[gy];
+      for (uint8_t gx = 0U; gx < 3U; ++gx) {
+        if ((row & (1U << (2U - gx))) != 0U)
+          LibOledGfx_FillRect(buffer, (uint8_t)(x + gx), (uint8_t)(y + gy),
+                              1U, 1U, 1U);
+      }
+    }
+    x = (uint8_t)(x + 4U);
+  }
+}
+
 static void drawSegment(uint8_t *buffer, uint8_t x, uint8_t y,
                         uint8_t segment) {
   const uint8_t t = 2U;
