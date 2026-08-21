@@ -45,6 +45,7 @@ bool    SM_Disp_AutoClose(void);
 void    SM_Disp_SetAutoClose(bool v);
 uint8_t SM_Disp_CloseDelay(void);
 void    SM_Disp_SetCloseDelay(uint8_t v);
+void    SM_Disp_SetConfig(uint8_t bright, bool auto_close, uint8_t delay_idx);
 
 bool SM_Debug_Dashboard(void);
 void SM_Debug_SetDashboard(bool v);

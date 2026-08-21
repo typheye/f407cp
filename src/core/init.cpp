@@ -272,7 +272,8 @@ static void cleanup_sd_root_whitelist(void) {
     bool found = false;
     FRESULT list_res = sd_root_find_extra(path, sizeof(path), &found);
     if (list_res != FR_OK) {
-      sd_cleanup_disable_for_boot("list root", list_res);
+      LOG_W("MAIN", "Skip SD root cleanup: list root => %s(%d)",
+            FMCore_FResultName(list_res), (int)list_res);
       return;
     }
     if (!found) return;
@@ -281,7 +282,8 @@ static void cleanup_sd_root_whitelist(void) {
     FRESULT del_res = sd_delete_recursive_quiet(path);
     SysWatchdog_FeedNow();
     if (del_res != FR_OK && del_res != FR_NO_FILE && del_res != FR_NO_PATH) {
-      sd_cleanup_disable_for_boot(path, del_res);
+      LOG_W("MAIN", "Skip SD root cleanup: cannot remove %s => %s(%d)",
+            path, FMCore_FResultName(del_res), (int)del_res);
       return;
     }
 

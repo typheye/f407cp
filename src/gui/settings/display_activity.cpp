@@ -149,15 +149,7 @@ void display_activity_run(void) {
       if (editing) {
         editing = false;
         edit_field = 0;
-        Settings_t *s = SM_Get();
-        uint8_t next_sleep_cfg =
-            (uint8_t)((sleep_delay << 1U) | (auto_close ? 1U : 0U));
-        if (s->disp_bright != (uint8_t)disp_bright ||
-            s->disp_sleep_cfg != next_sleep_cfg) {
-          s->disp_bright = (uint8_t)disp_bright;
-          s->disp_sleep_cfg = next_sleep_cfg;
-          SM_Save(); /* commit only when the value really changed */
-        }
+        SM_Disp_SetConfig((uint8_t)disp_bright, auto_close, sleep_delay);
         boardLCD.setBrightness((uint16_t)disp_bright * 100);
         dirty = true;
       } else {

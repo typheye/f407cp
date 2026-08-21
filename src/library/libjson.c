@@ -112,3 +112,57 @@ bool json_get_bool(const char *buf, const char *key, bool default_val) {
   if (!p) return default_val;
   return (*p == 't' || *p == 'T');
 }
+
+static bool jw_append(JsonWriter_t *w, const char *s) {
+  if (!w || !w->buf || !s || w->cap <= 0 || w->error) return false;
+  int n = (int)strlen(s);
+  if (w->len + n >= w->cap) {
+    w->error = true;
+    if (w->cap > 0) w->buf[w->cap - 1] = '\0';
+    return false;
+  }
+  memcpy(&w->buf[w->len], s, (size_t)n);
+  w->len += n;
+  w->buf[w->len] = '\0';
+  return true;
+}
+
+static bool jw_field(JsonWriter_t *w, const char *key) {
+  if (!w || !key) return false;
+  if (!w->first && !jw_append(w, ",\n")) return false;
+  w->first = false;
+  return jw_append(w, "  \"") && jw_append(w, key) && jw_append(w, "\": ");
+}
+
+void json_writer_begin(JsonWriter_t *w, char *buf, int cap) {
+  if (!w) return;
+  w->buf = buf;
+  w->cap = cap;
+  w->len = 0;
+  w->first = true;
+  w->error = false;
+  if (!buf || cap <= 0) {
+    w->error = true;
+    return;
+  }
+  buf[0] = '\0';
+  (void)jw_append(w, "{\n");
+}
+
+bool json_writer_add_int(JsonWriter_t *w, const char *key, int value) {
+  char num[16];
+  snprintf(num, sizeof(num), "%d", value);
+  return jw_field(w, key) && jw_append(w, num);
+}
+
+bool json_writer_add_bool(JsonWriter_t *w, const char *key, bool value) {
+  return jw_field(w, key) && jw_append(w, value ? "true" : "false");
+}
+
+bool json_writer_end(JsonWriter_t *w) {
+  return jw_append(w, "\n}\n");
+}
+
+bool json_writer_ok(const JsonWriter_t *w) {
+  return w && !w->error && w->buf && w->cap > 0 && w->len < w->cap;
+}

@@ -80,6 +80,20 @@ bool json_get_str(const char *buf, const char *key, char *out, int outsz);
  */
 bool json_get_bool(const char *buf, const char *key, bool default_val);
 
+typedef struct {
+  char *buf;
+  int cap;
+  int len;
+  bool first;
+  bool error;
+} JsonWriter_t;
+
+void json_writer_begin(JsonWriter_t *w, char *buf, int cap);
+bool json_writer_add_int(JsonWriter_t *w, const char *key, int value);
+bool json_writer_add_bool(JsonWriter_t *w, const char *key, bool value);
+bool json_writer_end(JsonWriter_t *w);
+bool json_writer_ok(const JsonWriter_t *w);
+
 #ifdef __cplusplus
 }
 #endif

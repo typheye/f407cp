@@ -90,10 +90,13 @@ SDCard_Status_t TSDIO::init(void) {
   SysWatchdog_FeedNow();
 
   LOG_I("SDIO", "Starting init...");
+  LOG_I("SDIO", "Detect pin state: %u", (unsigned)BSP_SD_IsDetected());
 
 
   LOG_I("SDIO", "Calling HAL_SD_Init...");
   if (HAL_SD_Init(&hsd) != HAL_OK) {
+    LOG_E("SDIO", "HAL_SD_Init error code: 0x%08lX",
+          (unsigned long)HAL_SD_GetError(&hsd));
     LOG_E("SDIO", "HAL_SD_Init FAILED");
     _hardDisabled = true;
     LOG_E("SDIO", "SD card HARD DISABLED �?init failed");
@@ -172,6 +175,9 @@ SDCard_Status_t TSDIO::init(void) {
   SysWatchdog_FeedNow();
   LOG_I("SDIO", "Waiting for card ready...");
   if (!waitForReady(5000)) {
+    LOG_E("SDIO", "Card state at timeout: %ld", (long)HAL_SD_GetCardState(&hsd));
+    LOG_E("SDIO", "HAL_SD error code: 0x%08lX",
+          (unsigned long)HAL_SD_GetError(&hsd));
     LOG_E("SDIO", "Card ready timeout");
     _hardDisabled = true;
     LOG_E("SDIO", "SD card HARD DISABLED �?not ready");

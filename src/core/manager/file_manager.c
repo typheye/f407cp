@@ -132,7 +132,7 @@ FRESULT FMCore_MountInternal(void) {
 
 FRESULT FMCore_MountStorage(FATFS *fs, bool log_result) {
   FRESULT res;
-  if (TSDIO_IsHardDisabled() || !TSDIO_IsInitialized()) return FR_NOT_READY;
+  if (TSDIO_IsHardDisabled()) return FR_NOT_READY;
   if (g_storage_mounted) return FR_OK;
   res = f_mount(fs ? fs : &g_storage_fs, "0:", 1U);
   if (res == FR_OK) {
