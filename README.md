@@ -1,0 +1,20 @@
+# F407CP PC Tools
+
+## TVID Tool
+
+Convert a normal video into a `.tvid` stream that the STM32F407 firmware can
+play from SD card. The converter uses bundled OpenCV when packaged; it does not
+require an external `ffmpeg.exe` in PATH.
+
+```powershell
+python src\tvidtool\app.py input.mp4 -o test.tvid --fps 12 --size 240x240
+```
+
+Copy the output to the SD card as:
+
+```text
+0:/storage/test.tvid
+```
+
+The board-side launcher will play it automatically when the file exists and is
+valid.

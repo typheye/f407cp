@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+
+# Conda / virtual environments
+.conda/
+.venv/
+venv/
+
+# PyInstaller
+build/
+
+# Generated executables
+dist/
+
+# Editor / OS
+.vs/
+.DS_Store
+Thumbs.db

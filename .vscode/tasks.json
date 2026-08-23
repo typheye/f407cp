@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+
+    /* ============================ Build ============================ */
+
+    {
+      "label": "Build",
+      "group": { "kind": "build", "isDefault": true },
+      "detail": "Build tvidtool.exe.",
+      "type": "shell",
+      "icon": { "id": "build", "tooltip": "Build all" },
+      "command": "powershell",
+      "args": [
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/build.ps1"
+      ],
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+
+    /* ============================ Clean ============================ */
+
+    {
+      "label": "Clean",
+      "detail": "Remove build/, dist/ and Python cache files.",
+      "type": "shell",
+      "icon": { "id": "trash", "tooltip": "Clean all" },
+      "command": "${workspaceFolder}/scripts/clean.bat",
+      "presentation": { "reveal": "always", "panel": "shared" }
+    }
+  ]
+}
