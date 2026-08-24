@@ -200,7 +200,7 @@ void about_activity_run(void) {
       {"   Running", running_value},
       {"03 Update System", ""},
       {"   Reboot Device", ""},
-      {"   Restore SD Card", ""},
+      {"   Restore Factory", ""},
   };
 
   int sel = 0;
@@ -281,7 +281,7 @@ void about_activity_run(void) {
           NVIC_SystemReset();
         }
         break;
-      case 11: /* Restore SD Card */
+      case 11: /* Restore Factory */
         if (confirm_show("RST", "Format SD card?\nDevice will reboot.")) {
           /* Factory reset is owned by REC. SYSTEM only requests the
            * RECOVERY_FORMAT boot target and resets; REC formats the SD card,
@@ -289,7 +289,7 @@ void about_activity_run(void) {
           if (!Flash_BL_RecoveryAvailable()) {
             alert_show("RST", "Recovery is unavailable.");
           } else if (Flash_BL_SetBootTarget(
-                         FLASH_BL_BOOT_RECOVERY_INIT) == FLASH_OK) {
+                         FLASH_BL_BOOT_RECOVERY_FORMAT) == FLASH_OK) {
             NVIC_SystemReset();
           } else {
             alert_show("RST", "Failed to enter recovery.");
