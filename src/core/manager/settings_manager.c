@@ -84,8 +84,8 @@ static uint8_t disp_sleep_delay_idx(void) {
 }
 
 static void sanitize(void) {
-  if (g_settings.disp_bright < 1U || g_settings.disp_bright > 10U) {
-    g_settings.disp_bright = 10U;
+  if (g_settings.disp_bright > 10U) {
+    g_settings.disp_bright = 0U;
   }
   if (disp_sleep_delay_idx() > 5U) {
     g_settings.disp_sleep_cfg = 0x04U;
@@ -103,13 +103,13 @@ static void sanitize(void) {
 static void defaults(void) {
   memset(&g_settings, 0, sizeof(g_settings));
   g_settings.magic = SM_MAGIC;
-  g_settings.disp_bright = 10U;
+  g_settings.disp_bright = 0U;
   g_settings.disp_sleep_cfg = 0x04U;
   g_settings.debug_dashboard = 0U;
   g_settings.debug_log_com = 1U;
   g_settings.time_style_24h = true;
   g_settings.boot_gfx = true;
-  g_settings.sound_mute = true;
+  g_settings.sound_mute = false;
   sanitize();
   LOG_D("SMGR", "Defaults loaded");
 }
@@ -433,8 +433,6 @@ Settings_t *SM_Get(void) { return &g_settings; }
 
 uint8_t SM_Disp_Bright(void) { return g_settings.disp_bright; }
 void SM_Disp_SetBright(uint8_t v) {
-  if (v < 1U)
-    v = 1U;
   if (v > 10U)
     v = 10U;
   if (g_settings.disp_bright != v) {
@@ -513,8 +511,6 @@ void SM_Disp_SetCloseDelay(uint8_t v) {
 }
 
 void SM_Disp_SetConfig(uint8_t bright, bool auto_close, uint8_t delay_idx) {
-  if (bright < 1U)
-    bright = 1U;
   if (bright > 10U)
     bright = 10U;
   if (delay_idx > 5U)

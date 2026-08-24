@@ -16,6 +16,10 @@ typedef struct {
 
 extern char _sccmram;
 extern char _eccmram;
+extern char _end;
+extern char _estack;
+
+#define SYSDRAM_STACK_RESERVE (4U * 1024U)
 
 static uint32_t g_alloc_count;
 static size_t g_ram_used_bytes;
@@ -122,7 +126,12 @@ int SysDram_GetStats(SysDramRegion_t region, SysDramStats_t *out) {
 
   memset(out, 0, sizeof(*out));
   if (region == SYSDRAM_REGION_RAM) {
-    out->total = 128U * 1024U;
+    uintptr_t heap_start = (uintptr_t)&_end;
+    uintptr_t stack_top = (uintptr_t)&_estack;
+    uintptr_t heap_end = stack_top > SYSDRAM_STACK_RESERVE
+                             ? stack_top - SYSDRAM_STACK_RESERVE
+                             : stack_top;
+    out->total = heap_end > heap_start ? (uint32_t)(heap_end - heap_start) : 0U;
     out->used = (uint32_t)(g_ram_used_bytes > out->total ? out->total
                                                          : g_ram_used_bytes);
     out->free = out->total - out->used;

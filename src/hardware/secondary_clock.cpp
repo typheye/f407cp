@@ -29,7 +29,11 @@ void servicePagedRefresh() {
     return;
   if (oled.busy())
     return;
-  if (oled.displayPageDma(pendingPage, &frameBuffer[pendingPage * 128U])) {
+  /* Use the blocking page transaction here. The DMA path depends on the
+   * generated I2C callback chain and can leave the panel permanently busy
+   * after a regenerated CubeMX project; a 1 KB page takes only a few ms at
+   * 400 kHz and is deterministic. */
+  if (oled.displayPage(pendingPage, &frameBuffer[pendingPage * 128U])) {
     pendingPage++;
     pageRetry = 0U;
   } else if (++pageRetry > 8U) {

@@ -36,6 +36,7 @@ void LCD_FlushTiled(void (*render_cb)(void));
 void LCD_FlushTiledBlocking(void (*render_cb)(void));
 void LCD_EmergencyPrepare(void);
 void LCD_UpdateAutoBrightness(void);
+void LCD_SetDebugOverlaySuppressed(uint8_t suppressed);
 uint16_t LCD_RGB888ToRGB565(uint32_t rgb888);
 uint16_t LCD_GetWidth(void);
 uint16_t LCD_GetHeight(void);

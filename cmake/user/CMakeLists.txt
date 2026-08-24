@@ -70,6 +70,7 @@ set(USER_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/lib3dgyro.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libfs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libjson.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libvideo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/sysdram_compat.c
 
     ${USER_GUI_Src}

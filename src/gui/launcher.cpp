@@ -22,6 +22,8 @@
 
 #include "include/launcher.hpp"
 #include "library/include/libdly.h"
+#include "library/include/libpd.h"
+#include "library/include/libvideo.h"
 
 
 #ifndef CCMRAM
@@ -34,6 +36,42 @@ extern LCD boardLCD;
 static void pet_launcher_drain_nav_keys(void) {
   (void)keyManager._collisionA8.getState();
   (void)keyManager._collisionD0.getState();
+}
+
+struct VideoInputState {
+  uint32_t press_times[3];
+  uint8_t count;
+  uint8_t last_pressed;
+};
+
+static int launcher_video_pump(void *opaque) {
+  VideoInputState *state = static_cast<VideoInputState *>(opaque);
+  keyManager.tick();
+  const uint8_t pressed =
+      keyManager._btnEnter.getState() == KEY_PRESSED ? 1U : 0U;
+  const uint32_t now = HAL_GetTick();
+  if (pressed && !state->last_pressed) {
+    state->press_times[state->count % 3U] = now;
+    ++state->count;
+    if (state->count >= 3U) {
+      const uint32_t first = state->press_times[(state->count - 3U) % 3U];
+      if (now - first < 800U)
+        return 1;
+    }
+  }
+  state->last_pressed = pressed;
+  TosApi_Tick();
+  SysWatchdog_Tick();
+  return 0;
+}
+
+static void launcher_video_status(const char *text) {
+  LCD_FLUSH({
+    PD_FillScreen(TOS_BG);
+    PD_SetFont(FONT_ASCII_16);
+    PD_SetColor(TOS_TEXT_SEC);
+    PD_DrawStringCentered(0, 106, LCD_WIDTH, 24, text);
+  });
 }
 
 // ============ Animation state (CCMRAM to save main RAM) ============
@@ -897,6 +935,26 @@ static void update_animation(void) {
 void petLauncherRun(void) {
   EMO_Init();
   EHW_Init();
+
+  /* A valid TVID replaces the idle launcher animation. Input is still pumped
+   * from the decoder so the existing triple-ENTER escape remains available. */
+  VideoInputState video_input{{0U, 0U, 0U}, 0U, 0U};
+  LCD_SetDebugOverlaySuppressed(1U);
+  LibVideoResult video_result =
+      LibVideo_Play("0:/storage/test.tvid", launcher_video_pump, &video_input);
+  LCD_SetDebugOverlaySuppressed(0U);
+  if (video_result == LIBVIDEO_ABORTED) {
+    LCD_FLUSH({ EMO_FillScreen(EMO_BLACK); });
+    return;
+  }
+  if (video_result != LIBVIDEO_OK) {
+    LOG_W("PET", "TVID playback: %s", LibVideo_ResultText(video_result));
+    launcher_video_status(LibVideo_ResultText(video_result));
+    while (!launcher_video_pump(&video_input))
+      JPDelay(1U);
+    LCD_FLUSH({ EMO_FillScreen(EMO_BLACK); });
+    return;
+  }
 
   uint32_t now = HAL_GetTick();
   next_blink_tm = now + 2300U + rnd(3000U);

@@ -96,6 +96,7 @@ void APP::init() {
   SysWatchdog_FeedNow();
   JPDelay(250);
   PD_SplashFinish(220U);
+  boardLCD.setBrightness((uint16_t)SM_Disp_Bright() * 100U);
   SecondaryClock_Init();
   SysUI_DebugOverlaySetEnabled(SM_Debug_Dashboard() ? 1U : 0U);
   SysUI::setActivity(UI_PET);

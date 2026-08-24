@@ -27,7 +27,7 @@
 extern KeyManager keyManager;
 extern LCD boardLCD;
 
-static int disp_bright = 10; // 1-10
+static int disp_bright = 0; // 0-10
 static bool disp_inited = false; // only apply defaults first time
 
 static const char *auto_close_names[] = {"OFF", "ON"};
@@ -65,7 +65,7 @@ static void draw_disp(int sel, bool editing, int edit_field, bool auto_close,
         char buf[32];
         snprintf(buf, sizeof(buf), "01 Brightness");
         char val[8];
-        snprintf(val, sizeof(val), "%d%%", disp_bright * 10);
+        snprintf(val, sizeof(val), "%02d%%", disp_bright * 10);
         UI_DrawMenuValue(idx, sel, cy, buf, val, editing && edit_field == 1);
         break;
       }
@@ -130,8 +130,8 @@ void display_activity_run(void) {
       if (editing) {
         if (edit_field == 1) {
           disp_bright--;
-          if (disp_bright < 1)
-            disp_bright = 1;
+          if (disp_bright < 0)
+            disp_bright = 0;
           apply(); /* live preview */
         } else if (edit_field == 3) {
           auto_close = false;

@@ -13,7 +13,7 @@ extern void lcd_dma_yield(void);
 static volatile uint8_t lcd_debug_overlay_suppressed = 0;
 
 namespace {
-constexpr uint16_t kDefaultBrightness = 700U;
+constexpr uint16_t kDefaultBrightness = 0U;
 constexpr uint32_t kBrightnessMagic = 0x42524954U;
 constexpr uint32_t kBackupMagicRegister = RTC_BKP_DR1;
 constexpr uint32_t kBackupValueRegister = RTC_BKP_DR2;
@@ -123,13 +123,8 @@ void LCD::init() {
   JPDelay(100U);
 
   _initialized = true;
-  if (HAL_RTCEx_BKUPRead(&hrtc, kBackupMagicRegister) == kBrightnessMagic) {
-    const uint32_t stored = HAL_RTCEx_BKUPRead(&hrtc, kBackupValueRegister);
-    if (stored <= 1000U) {
-      _brightness = static_cast<uint16_t>(stored);
-    }
-  }
-  setBrightness(_brightness);
+  /* The bootloader/main handoff leaves TIM4 at 100% for the splash. The saved
+   * user brightness is deliberately applied only after PD_SplashFinish(). */
 }
 
 void LCD::setBrightness(uint16_t value) {
@@ -155,8 +150,8 @@ void LCD::applyBrightness(uint16_t value) {
 
 void LCD::adjustBrightness(int16_t delta) {
   int32_t next = static_cast<int32_t>(_brightness) + delta;
-  if (next < 100)
-    next = 100;
+  if (next < 0)
+    next = 0;
   if (next > 1000)
     next = 1000;
   setBrightness(static_cast<uint16_t>(next));
