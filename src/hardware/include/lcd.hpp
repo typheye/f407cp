@@ -27,7 +27,9 @@ public:
   uint16_t rgb888ToRgb565(uint32_t color) const;
   uint16_t *getFrameBuffer();
   void beginTileRender(uint16_t y, uint16_t h);
+  void beginTileRenderVideo(uint16_t y, uint16_t h);
   void endTileRender();
+  void endTileRenderVideo();
   void flushTiled(void (*render_cb)(void));
   template <typename Render>
   void flushTiled(Render render) {

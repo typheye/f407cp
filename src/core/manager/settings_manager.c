@@ -85,7 +85,7 @@ static uint8_t disp_sleep_delay_idx(void) {
 
 static void sanitize(void) {
   if (g_settings.disp_bright > 10U) {
-    g_settings.disp_bright = 0U;
+    g_settings.disp_bright = 10U;
   }
   if (disp_sleep_delay_idx() > 5U) {
     g_settings.disp_sleep_cfg = 0x04U;
@@ -103,7 +103,7 @@ static void sanitize(void) {
 static void defaults(void) {
   memset(&g_settings, 0, sizeof(g_settings));
   g_settings.magic = SM_MAGIC;
-  g_settings.disp_bright = 0U;
+  g_settings.disp_bright = 10U;
   g_settings.disp_sleep_cfg = 0x04U;
   g_settings.debug_dashboard = 0U;
   g_settings.debug_log_com = 1U;

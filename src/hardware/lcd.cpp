@@ -3,6 +3,7 @@
 #include "library/include/libpd.h"
 #include "library/include/libemo.h"
 #include "library/include/libdly.h"
+#include "core/sys/include/syswatchdog.h"
 #include "rtc.h"
 
 extern "C" void SysUI_DebugOverlayBeginFrame(void);
@@ -13,11 +14,11 @@ extern void lcd_dma_yield(void);
 static volatile uint8_t lcd_debug_overlay_suppressed = 0;
 
 namespace {
-constexpr uint16_t kDefaultBrightness = 0U;
+constexpr uint16_t kDefaultBrightness = 1000U;
 constexpr uint32_t kBrightnessMagic = 0x42524954U;
 constexpr uint32_t kBackupMagicRegister = RTC_BKP_DR1;
 constexpr uint32_t kBackupValueRegister = RTC_BKP_DR2;
-uint16_t tileBuffer[LCD_WIDTH * TILE_HEIGHT];
+uint16_t tileBuffer[LCD_WIDTH * TILE_HEIGHT] __attribute__((aligned(4)));
 
 void configureControlPins() {
   __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -245,6 +246,23 @@ void LCD::beginTileRender(uint16_t y, uint16_t h) {
     tileBuffer[i] = 0U;
 }
 
+static void lcd_video_dma_yield(void) {
+  SysWatchdog_Tick();
+}
+
+void LCD::beginTileRenderVideo(uint16_t y, uint16_t h) {
+  if (y >= LCD_HEIGHT)
+    y = LCD_HEIGHT - 1U;
+  if (h == 0U)
+    h = 1U;
+  if (h > TILE_HEIGHT)
+    h = TILE_HEIGHT;
+  if (y + h > LCD_HEIGHT)
+    h = static_cast<uint16_t>(LCD_HEIGHT - y);
+  _tileY = y;
+  _tileH = h;
+}
+
 void LCD::endTileRender() {
   if (!_initialized)
     return;
@@ -289,6 +307,38 @@ void LCD::endTileRender() {
   }
 }
 
+void LCD::endTileRenderVideo() {
+  if (!_initialized)
+    return;
+  const uint32_t pixels = static_cast<uint32_t>(LCD_WIDTH) * _tileH;
+  setAddress(0U, _tileY, LCD_WIDTH - 1U,
+             static_cast<uint16_t>(_tileY + _tileH - 1U));
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11, GPIO_PIN_RESET);
+  HAL_StatusTypeDef st = HAL_SPI_Transmit_DMA(
+      &hspi1, reinterpret_cast<uint8_t *>(tileBuffer),
+      static_cast<uint16_t>(pixels * 2U));
+  if (st == HAL_OK) {
+    uint32_t timeout = HAL_GetTick() + 120U;
+    while (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY) {
+      if ((int32_t)(HAL_GetTick() - timeout) >= 0) {
+        (void)HAL_SPI_Abort(&hspi1);
+        break;
+      }
+      lcd_video_dma_yield();
+    }
+    timeout = HAL_GetTick() + 5U;
+    while (__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_BSY) != RESET &&
+           (int32_t)(HAL_GetTick() - timeout) < 0) {
+      SysWatchdog_Tick();
+    }
+  } else {
+    (void)HAL_SPI_Transmit(&hspi1, reinterpret_cast<uint8_t *>(tileBuffer),
+                           static_cast<uint16_t>(pixels * 2U), 1000U);
+  }
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11, GPIO_PIN_SET);
+}
+
 void LCD::flushTiled(void (*render_cb)(void)) {
   if (!_initialized || render_cb == nullptr)
     return;
@@ -319,7 +369,11 @@ void LCD_ClearFrameBuffer(uint32_t color) {
     tileBuffer[i] = value;
 }
 void LCD_BeginTileRender(uint16_t y, uint16_t h) { boardLCD.beginTileRender(y, h); }
+void LCD_BeginTileRenderVideo(uint16_t y, uint16_t h) {
+  boardLCD.beginTileRenderVideo(y, h);
+}
 void LCD_EndTileRender(void) { boardLCD.endTileRender(); }
+void LCD_EndTileRenderVideo(void) { boardLCD.endTileRenderVideo(); }
 void LCD_FlushTiled(void (*render_cb)(void)) { boardLCD.flushTiled(render_cb); }
 void LCD_FlushTiledBlocking(void (*render_cb)(void)) { boardLCD.flushTiled(render_cb); }
 void LCD_EmergencyPrepare(void) {

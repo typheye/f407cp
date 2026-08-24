@@ -6,7 +6,7 @@
 
 #define LCD_WIDTH 240U
 #define LCD_HEIGHT 240U
-#define TILE_HEIGHT 60U
+#define TILE_HEIGHT 128U
 
 #define LCD_COLOR_BLACK 0x000000U
 #define LCD_COLOR_WHITE 0xFFFFFFU
@@ -31,7 +31,9 @@ void LCD_Flush(void);
 uint16_t *LCD_GetFrameBuffer(void);
 void LCD_ClearFrameBuffer(uint32_t color);
 void LCD_BeginTileRender(uint16_t y, uint16_t h);
+void LCD_BeginTileRenderVideo(uint16_t y, uint16_t h);
 void LCD_EndTileRender(void);
+void LCD_EndTileRenderVideo(void);
 void LCD_FlushTiled(void (*render_cb)(void));
 void LCD_FlushTiledBlocking(void (*render_cb)(void));
 void LCD_EmergencyPrepare(void);

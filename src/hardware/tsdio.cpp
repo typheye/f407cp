@@ -28,7 +28,7 @@
  * switch long enough for IWDG to reset the board. Enable this only after
  * card init and REC init are proven stable on the target hardware. */
 #ifndef TSDIO_ENABLE_WIDE_BUS
-#define TSDIO_ENABLE_WIDE_BUS 0
+#define TSDIO_ENABLE_WIDE_BUS 1
 #endif
 
 
@@ -45,6 +45,10 @@ static void TSDIO_ResetHalHandle(void) {
     (void)HAL_SD_DeInit(&hsd);
   }
   MX_SDIO_SD_Init();
+  /* The generated profile is conservative (48 MHz / (2 + 2) = 12 MHz).
+   * Standard-speed SD cards support 25 MHz; use 24 MHz here and switch to
+   * the already-routed D0-D3 bus after card identification. */
+  hsd.Init.ClockDiv = 0U;
   __HAL_RCC_DMA2_CLK_ENABLE();
 }
 

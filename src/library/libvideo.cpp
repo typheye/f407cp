@@ -1,9 +1,14 @@
 #include "include/libvideo.h"
 
 #include "core/sys/include/syswatchdog.h"
+#include "core/sys/include/sysfonts.h"
+#include "core/manager/include/settings_manager.h"
+#include "dram.h"
 #include "ff.h"
 #include "hardware/include/lcd.h"
+#include "hardware/include/lcd.hpp"
 #include "stm32f4xx_hal.h"
+#include <cstdio>
 #include <cstdint>
 #include <cstring>
 
@@ -13,6 +18,100 @@ constexpr uint16_t kHeaderSize = 40U;
 constexpr uint16_t kFlagLoop = 0x0001U;
 constexpr uint8_t kCodecRaw = 1U;
 constexpr uint8_t kCodecRle = 2U;
+constexpr uint32_t kRleReadBufferSize = 2048U;
+constexpr uint32_t kFramePixels = LCD_WIDTH * LCD_HEIGHT;
+constexpr uint32_t kRawPayloadSize = kFramePixels * 2U;
+constexpr uint32_t kMaxRlePayloadSize = kFramePixels * 4U;
+uint8_t rleReadBuffer[kRleReadBufferSize] __attribute__((aligned(4)));
+uint16_t measuredFps = 0U;
+
+void video_put_pixel(uint16_t *pixels, uint16_t tile_y, uint16_t tile_h,
+                     uint16_t x, uint16_t y, uint16_t wire_color) {
+  if (x >= LCD_WIDTH || y < tile_y || y >= tile_y + tile_h)
+    return;
+  const uint32_t logical = static_cast<uint32_t>(y - tile_y) * LCD_WIDTH + x;
+  const uint32_t count = static_cast<uint32_t>(LCD_WIDTH) * tile_h;
+  const uint32_t dst = boardLCD.getRotation() == 0U ? count - 1U - logical
+                                                    : logical;
+  pixels[dst] = wire_color;
+}
+
+uint16_t ascii12_string_width(const char *text) {
+  const size_t length = strlen(text);
+  return length == 0U ? 0U : static_cast<uint16_t>(length * 7U - 1U);
+}
+
+void draw_ascii12(uint16_t *pixels, uint16_t tile_y, uint16_t tile_h,
+                  uint16_t x, uint16_t y, const char *text,
+                  uint16_t wire_color) {
+  const pFONT font = ASCII_Font12;
+  for (; *text != '\0'; ++text, x += font->Width + 1U) {
+    char ch = (*text >= 32 && *text <= 126) ? *text : '?';
+    const uint8_t *glyph = font->pTable +
+                           static_cast<uint16_t>(ch - 32) * font->Bytes;
+    uint16_t pixel = 0U;
+    uint8_t column = 0U;
+    for (uint16_t index = 0U; index < font->Bytes; ++index) {
+      uint8_t bits = glyph[index];
+      for (uint8_t bit = 0U; bit < 8U; ++bit) {
+        if ((bits & 0x01U) != 0U) {
+          video_put_pixel(pixels, tile_y, tile_h,
+                          static_cast<uint16_t>(x + column),
+                          static_cast<uint16_t>(y + pixel / font->Width),
+                          wire_color);
+        }
+        ++pixel;
+        ++column;
+        if (column == font->Width) {
+          column = 0U;
+          break;
+        }
+        bits >>= 1U;
+      }
+    }
+  }
+}
+
+void draw_fps_overlay(uint16_t *pixels, uint16_t tile_y, uint16_t tile_h) {
+  if (!SM_Debug_Dashboard())
+    return;
+  const uint16_t y0 = LCD_HEIGHT - 29U;
+  if (tile_y + tile_h <= y0 || tile_y >= LCD_HEIGHT)
+    return;
+  SysDramStats_t ram{};
+  SysDramStats_t ccm{};
+  (void)SysDram_GetStats(SYSDRAM_REGION_RAM, &ram);
+  (void)SysDram_GetStats(SYSDRAM_REGION_CCM, &ccm);
+  constexpr uint32_t ram_total = 128U * 1024U;
+  constexpr uint32_t ccm_total = 64U * 1024U;
+  uint32_t ram_used = (ram_total > ram.total ? ram_total - ram.total : 0U) +
+                      ram.used;
+  uint32_t ccm_used = (ccm_total > ccm.total ? ccm_total - ccm.total : 0U) +
+                      ccm.used;
+  if (ram_used > ram_total) ram_used = ram_total;
+  if (ccm_used > ccm_total) ccm_used = ccm_total;
+  const unsigned ram_pct = (ram_used * 100U + ram_total / 2U) / ram_total;
+  const unsigned ccm_pct = (ccm_used * 100U + ccm_total / 2U) / ccm_total;
+  char perf[28];
+  char memory[28];
+  snprintf(perf, sizeof(perf), "FPS: %3uF | CPU: %3u%%",
+           static_cast<unsigned>(measuredFps > 999U ? 999U : measuredFps),
+           100U);
+  snprintf(memory, sizeof(memory), "RAM: %3u%% | CRM: %3u%%", ram_pct,
+           ccm_pct);
+  const uint16_t perf_width = ascii12_string_width(perf);
+  const uint16_t memory_width = ascii12_string_width(memory);
+  const uint16_t width =
+      static_cast<uint16_t>((perf_width > memory_width ? perf_width
+                                                        : memory_width) + 8U);
+  const uint16_t x0 = static_cast<uint16_t>(LCD_WIDTH - width);
+  for (uint16_t y = y0; y < LCD_HEIGHT; ++y)
+    for (uint16_t x = x0; x < LCD_WIDTH; ++x)
+      video_put_pixel(pixels, tile_y, tile_h, x, y, 0x0000U);
+  draw_ascii12(pixels, tile_y, tile_h, x0 + 4U, y0 + 2U, perf, 0xE007U);
+  draw_ascii12(pixels, tile_y, tile_h, x0 + 4U, y0 + 15U, memory,
+               0xE0FFU);
+}
 
 #pragma pack(push, 1)
 struct FileHeader {
@@ -54,36 +153,42 @@ bool read_exact(FIL *file, void *dst, UINT size) {
 
 LibVideoResult render_raw(FIL *file, const FrameHeader &frame,
                           LibVideoPumpFn pump, void *user) {
-  const uint32_t expected = LCD_WIDTH * LCD_HEIGHT * 2U;
-  if (frame.payload_size != expected)
+  (void)pump;
+  (void)user;
+  if (frame.payload_size != kRawPayloadSize)
     return LIBVIDEO_INVALID;
 
   for (uint16_t y = 0U; y < LCD_HEIGHT; y += TILE_HEIGHT) {
     const uint16_t h = static_cast<uint16_t>(
         (y + TILE_HEIGHT <= LCD_HEIGHT) ? TILE_HEIGHT : LCD_HEIGHT - y);
-    LCD_BeginTileRender(y, h);
+    LCD_BeginTileRenderVideo(y, h);
     uint16_t *pixels = LCD_GetFrameBuffer();
     const UINT bytes = static_cast<UINT>(LCD_WIDTH * h * 2U);
     if (!read_exact(file, pixels, bytes))
       return LIBVIDEO_IO_ERROR;
 
     const uint32_t count = static_cast<uint32_t>(LCD_WIDTH) * h;
-    const uint8_t *raw = reinterpret_cast<const uint8_t *>(pixels);
-    for (uint32_t i = 0U; i < count; ++i) {
-      const uint8_t hi = raw[i * 2U];
-      const uint8_t lo = raw[i * 2U + 1U];
-      pixels[i] = static_cast<uint16_t>((static_cast<uint16_t>(hi) << 8U) | lo);
+    if (boardLCD.getRotation() == 0U) {
+      for (uint32_t left = 0U, right = count - 1U; left < right;
+           ++left, --right) {
+        const uint16_t value = pixels[left];
+        pixels[left] = pixels[right];
+        pixels[right] = value;
+      }
     }
-    LCD_EndTileRender();
-    if (pumped(pump, user))
-      return LIBVIDEO_ABORTED;
+    draw_fps_overlay(pixels, y, h);
+    LCD_EndTileRenderVideo();
   }
   return LIBVIDEO_OK;
 }
 
 LibVideoResult render_rle(FIL *file, const FrameHeader &frame,
                           LibVideoPumpFn pump, void *user) {
+  (void)pump;
+  (void)user;
   uint32_t payload_read = 0U;
+  uint32_t buffered_pos = 0U;
+  uint32_t buffered_len = 0U;
   uint32_t pixels_done = 0U;
   uint16_t run_left = 0U;
   uint16_t run_color = 0U;
@@ -91,18 +196,27 @@ LibVideoResult render_rle(FIL *file, const FrameHeader &frame,
   for (uint16_t y = 0U; y < LCD_HEIGHT; y += TILE_HEIGHT) {
     const uint16_t h = static_cast<uint16_t>(
         (y + TILE_HEIGHT <= LCD_HEIGHT) ? TILE_HEIGHT : LCD_HEIGHT - y);
-    LCD_BeginTileRender(y, h);
+    LCD_BeginTileRenderVideo(y, h);
     uint16_t *pixels = LCD_GetFrameBuffer();
     const uint32_t tile_pixels = static_cast<uint32_t>(LCD_WIDTH) * h;
     uint32_t out = 0U;
 
     while (out < tile_pixels) {
       if (run_left == 0U) {
-        uint8_t run[4];
-        if (payload_read + sizeof(run) > frame.payload_size ||
-            !read_exact(file, run, sizeof(run)))
-          return LIBVIDEO_IO_ERROR;
-        payload_read += sizeof(run);
+        if (buffered_pos == buffered_len) {
+          const uint32_t remaining = frame.payload_size - payload_read;
+          const UINT request = static_cast<UINT>(
+              remaining < kRleReadBufferSize ? remaining : kRleReadBufferSize);
+          if (request == 0U || !read_exact(file, rleReadBuffer, request))
+            return LIBVIDEO_IO_ERROR;
+          payload_read += request;
+          buffered_pos = 0U;
+          buffered_len = request;
+        }
+        if (buffered_len - buffered_pos < 4U)
+          return LIBVIDEO_INVALID;
+        const uint8_t *run = &rleReadBuffer[buffered_pos];
+        buffered_pos += 4U;
         run_left = static_cast<uint16_t>(run[0] | (run[1] << 8U));
         run_color = static_cast<uint16_t>((run[2] << 8U) | run[3]);
         if (run_left == 0U)
@@ -110,18 +224,24 @@ LibVideoResult render_rle(FIL *file, const FrameHeader &frame,
       }
       const uint32_t room = tile_pixels - out;
       const uint16_t take = run_left < room ? run_left : static_cast<uint16_t>(room);
+      const uint16_t wire_color = static_cast<uint16_t>((run_color << 8U) |
+                                                        (run_color >> 8U));
+      uint16_t *dst = boardLCD.getRotation() == 0U
+                          ? pixels + tile_pixels - out - take
+                          : pixels + out;
       for (uint16_t i = 0U; i < take; ++i)
-        pixels[out++] = run_color;
+        dst[i] = wire_color;
+      out += take;
       run_left = static_cast<uint16_t>(run_left - take);
       pixels_done += take;
     }
-    LCD_EndTileRender();
-    if (pumped(pump, user))
-      return LIBVIDEO_ABORTED;
+    draw_fps_overlay(pixels, y, h);
+    LCD_EndTileRenderVideo();
   }
 
   if (pixels_done != frame.pixel_count || pixels_done != LCD_WIDTH * LCD_HEIGHT ||
-      run_left != 0U || payload_read != frame.payload_size)
+      run_left != 0U || payload_read != frame.payload_size ||
+      buffered_pos != buffered_len)
     return LIBVIDEO_INVALID;
   return LIBVIDEO_OK;
 }
@@ -159,13 +279,25 @@ extern "C" LibVideoResult LibVideo_Play(const char *path, LibVideoPumpFn pump,
     return LIBVIDEO_INVALID;
   }
 
+  const uint64_t file_size = static_cast<uint64_t>(f_size(&file));
+  const uint64_t minimum_size =
+      static_cast<uint64_t>(header.header_size) +
+      static_cast<uint64_t>(header.frame_count) * sizeof(FrameHeader);
+  if (file_size < minimum_size) {
+    f_close(&file);
+    return LIBVIDEO_INVALID;
+  }
+
   const FSIZE_t first_frame = header.header_size;
+  measuredFps = 0U;
   do {
     if (f_lseek(&file, first_frame) != FR_OK) {
       f_close(&file);
       return LIBVIDEO_IO_ERROR;
     }
     const uint32_t loop_start = HAL_GetTick();
+    uint32_t fps_sample_start = loop_start;
+    uint32_t fps_frames = 0U;
     for (uint32_t index = 0U; index < header.frame_count; ++index) {
       FrameHeader frame{};
       if (!read_exact(&file, &frame, sizeof(frame))) {
@@ -173,8 +305,21 @@ extern "C" LibVideoResult LibVideo_Play(const char *path, LibVideoPumpFn pump,
         return LIBVIDEO_IO_ERROR;
       }
       if (std::memcmp(frame.magic, "FRM1", 4U) != 0 ||
-          frame.pixel_count != LCD_WIDTH * LCD_HEIGHT ||
+          frame.pixel_count != kFramePixels ||
           (frame.codec != kCodecRaw && frame.codec != kCodecRle)) {
+        f_close(&file);
+        return LIBVIDEO_INVALID;
+      }
+      const bool payload_valid =
+          frame.codec == kCodecRaw
+              ? frame.payload_size == kRawPayloadSize
+              : frame.payload_size >= 4U &&
+                    frame.payload_size <= kMaxRlePayloadSize &&
+                    (frame.payload_size & 3U) == 0U;
+      const uint64_t payload_offset = static_cast<uint64_t>(f_tell(&file));
+      if (!payload_valid || payload_offset > file_size ||
+          static_cast<uint64_t>(frame.payload_size) >
+              file_size - payload_offset) {
         f_close(&file);
         return LIBVIDEO_INVALID;
       }
@@ -184,6 +329,19 @@ extern "C" LibVideoResult LibVideo_Play(const char *path, LibVideoPumpFn pump,
       if (result != LIBVIDEO_OK) {
         f_close(&file);
         return result;
+      }
+      if (pumped(pump, user)) {
+        f_close(&file);
+        return LIBVIDEO_ABORTED;
+      }
+      ++fps_frames;
+      const uint32_t fps_now = HAL_GetTick();
+      const uint32_t fps_elapsed = fps_now - fps_sample_start;
+      if (fps_elapsed >= 500U) {
+        measuredFps = static_cast<uint16_t>(
+            (fps_frames * 1000U + fps_elapsed / 2U) / fps_elapsed);
+        fps_frames = 0U;
+        fps_sample_start = fps_now;
       }
       result = frame.codec == kCodecRaw
                                   ? render_raw(&file, frame, pump, user)

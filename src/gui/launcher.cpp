@@ -21,6 +21,7 @@
  */
 
 #include "include/launcher.hpp"
+#include "core/manager/include/file_manager.h"
 #include "library/include/libdly.h"
 #include "library/include/libpd.h"
 #include "library/include/libvideo.h"
@@ -72,6 +73,18 @@ static void launcher_video_status(const char *text) {
     PD_SetColor(TOS_TEXT_SEC);
     PD_DrawStringCentered(0, 106, LCD_WIDTH, 24, text);
   });
+}
+
+static void launcher_video_status_timeout(const char *text,
+                                          uint32_t duration_ms) {
+  launcher_video_status(text);
+  const uint32_t start = HAL_GetTick();
+  while (HAL_GetTick() - start < duration_ms) {
+    keyManager.tick();
+    TosApi_Tick();
+    SysWatchdog_Tick();
+    JPDelay(1U);
+  }
 }
 
 // ============ Animation state (CCMRAM to save main RAM) ============
@@ -939,8 +952,15 @@ void petLauncherRun(void) {
   /* A valid TVID replaces the idle launcher animation. Input is still pumped
    * from the decoder so the existing triple-ENTER escape remains available. */
   VideoInputState video_input{{0U, 0U, 0U}, 0U, 0U};
+  LibVideoResult video_result = LIBVIDEO_NOT_FOUND;
+  if (!FMCore_IsStorageMounted()) {
+    LOG_W("PET", "TVID playback skipped: SD card is offline");
+    launcher_video_status_timeout("SD CARD OFFLINE", 900U);
+    return;
+  }
+
   LCD_SetDebugOverlaySuppressed(1U);
-  LibVideoResult video_result =
+  video_result =
       LibVideo_Play("0:/storage/test.tvid", launcher_video_pump, &video_input);
   LCD_SetDebugOverlaySuppressed(0U);
   if (video_result == LIBVIDEO_ABORTED) {
@@ -949,9 +969,7 @@ void petLauncherRun(void) {
   }
   if (video_result != LIBVIDEO_OK) {
     LOG_W("PET", "TVID playback: %s", LibVideo_ResultText(video_result));
-    launcher_video_status(LibVideo_ResultText(video_result));
-    while (!launcher_video_pump(&video_input))
-      JPDelay(1U);
+    launcher_video_status_timeout(LibVideo_ResultText(video_result), 900U);
     LCD_FLUSH({ EMO_FillScreen(EMO_BLACK); });
     return;
   }

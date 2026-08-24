@@ -40,7 +40,7 @@ static void draw_progress(int x, int y, int w, int h, int pct,
                           const char *label) {
   if (pct < 0)
     pct = 0;
-  if (pct > 16)
+  if (pct > 100)
     pct = 100;
   PD_SetColor(TOS_CARD_BG);
   PD_SetFill(true);
@@ -116,10 +116,12 @@ static bool get_sd_fs_info(int *used_pct, uint32_t *total_kb) {
     total_kb64 = 0xFFFFFFFFULL;
   *total_kb = (uint32_t)total_kb64;
 
-  DWORD used_clusters = total_clusters - free_clusters;
+  DWORD used_clusters = free_clusters <= total_clusters
+                            ? total_clusters - free_clusters
+                            : 0U;
   *used_pct = (int)(((uint64_t)used_clusters * 100ULL + total_clusters / 2U) /
                     (uint64_t)total_clusters);
-  if (*used_pct > 16)
+  if (*used_pct > 100)
     *used_pct = 100;
   if (*used_pct < 0)
     *used_pct = 0;
