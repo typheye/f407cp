@@ -33,7 +33,7 @@ public:
   void flushTiled(void (*render_cb)(void));
   template <typename Render>
   void flushTiled(Render render) {
-    if (!_initialized)
+    if (!_initialized || _sleeping)
       return;
     for (uint16_t y = 0U; y < LCD_HEIGHT; y += TILE_HEIGHT) {
       beginTileRender(y, TILE_HEIGHT);

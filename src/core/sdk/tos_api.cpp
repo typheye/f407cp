@@ -122,6 +122,7 @@ void TosApi_Tick(void) {
       }
     } else if (key1_pressed_edge) {
       boardLCD.wake();
+      SecondaryClock_SetDisplayOn(true);
       screen_sleeping = false;
       wake_key_suppressed = true;
       wake_guard_until_ms = now + 150U;
@@ -129,6 +130,7 @@ void TosApi_Tick(void) {
     }
   } else {
     if (key1_pressed_edge) {
+      SecondaryClock_SetDisplayOn(false);
       boardLCD.sleep();
       screen_sleeping = true;
       wake_key_suppressed = true;
@@ -138,6 +140,7 @@ void TosApi_Tick(void) {
       last_user_activity_ms = now;
     } else if (SM_Disp_AutoClose() &&
         (uint32_t)(now - last_user_activity_ms) >= disp_sleep_timeout_ms()) {
+      SecondaryClock_SetDisplayOn(false);
       boardLCD.sleep();
       screen_sleeping = true;
       wake_key_suppressed = power_key_stable_down;

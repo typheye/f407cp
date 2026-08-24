@@ -129,7 +129,7 @@ void LCD::init() {
 }
 
 void LCD::setBrightness(uint16_t value) {
-  if (value > 1000U)
+  if (value == 0U || value > 1000U)
     value = 1000U;
   _brightness = value;
   if (!_sleeping) {
@@ -171,13 +171,29 @@ void LCD::sleep() {
   if (_sleeping)
     return;
   _sleep_restore_brightness = _brightness ? _brightness : kDefaultBrightness;
-  _sleeping = true;
   applyBrightness(0U);
+  if (_initialized) {
+    uint32_t timeout = HAL_GetTick() + 120U;
+    while (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY &&
+           (int32_t)(HAL_GetTick() - timeout) < 0) {
+      SysWatchdog_Tick();
+    }
+    if (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY)
+      (void)HAL_SPI_Abort(&hspi1);
+    writeCommand(0x28U); /* display off */
+    writeCommand(0x10U); /* sleep in */
+  }
+  _sleeping = true;
 }
 
 void LCD::wake() {
   if (!_sleeping)
     return;
+  if (_initialized) {
+    writeCommand(0x11U); /* sleep out */
+    HAL_Delay(120U);
+    writeCommand(0x29U); /* display on */
+  }
   _sleeping = false;
   applyBrightness(_sleep_restore_brightness ? _sleep_restore_brightness
                                             : kDefaultBrightness);
@@ -190,7 +206,8 @@ void LCD::updateAutoBrightness() {
 
 void LCD::fillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                    uint32_t color) {
-  if (!_initialized || x >= LCD_WIDTH || y >= LCD_HEIGHT || w == 0U || h == 0U)
+  if (!_initialized || _sleeping || x >= LCD_WIDTH || y >= LCD_HEIGHT ||
+      w == 0U || h == 0U)
     return;
   if (x + w > LCD_WIDTH)
     w = static_cast<uint16_t>(LCD_WIDTH - x);
@@ -264,7 +281,7 @@ void LCD::beginTileRenderVideo(uint16_t y, uint16_t h) {
 }
 
 void LCD::endTileRender() {
-  if (!_initialized)
+  if (!_initialized || _sleeping)
     return;
   const uint32_t pixels = static_cast<uint32_t>(LCD_WIDTH) * _tileH;
   if (!lcd_debug_overlay_suppressed) {
@@ -308,7 +325,7 @@ void LCD::endTileRender() {
 }
 
 void LCD::endTileRenderVideo() {
-  if (!_initialized)
+  if (!_initialized || _sleeping)
     return;
   const uint32_t pixels = static_cast<uint32_t>(LCD_WIDTH) * _tileH;
   setAddress(0U, _tileY, LCD_WIDTH - 1U,
@@ -340,7 +357,7 @@ void LCD::endTileRenderVideo() {
 }
 
 void LCD::flushTiled(void (*render_cb)(void)) {
-  if (!_initialized || render_cb == nullptr)
+  if (!_initialized || _sleeping || render_cb == nullptr)
     return;
   for (uint16_t y = 0U; y < LCD_HEIGHT; y += TILE_HEIGHT) {
     beginTileRender(y, TILE_HEIGHT);

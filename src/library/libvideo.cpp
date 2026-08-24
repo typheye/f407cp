@@ -24,6 +24,8 @@ constexpr uint32_t kRawPayloadSize = kFramePixels * 2U;
 constexpr uint32_t kMaxRlePayloadSize = kFramePixels * 4U;
 uint8_t rleReadBuffer[kRleReadBufferSize] __attribute__((aligned(4)));
 uint16_t measuredFps = 0U;
+char dashboardPerf[28] = "FPS:   0F | CPU: 100%";
+char dashboardMemory[28] = "RAM:   0% | CRM:   0%";
 
 void video_put_pixel(uint16_t *pixels, uint16_t tile_y, uint16_t tile_h,
                      uint16_t x, uint16_t y, uint16_t wire_color) {
@@ -39,6 +41,28 @@ void video_put_pixel(uint16_t *pixels, uint16_t tile_y, uint16_t tile_h,
 uint16_t ascii12_string_width(const char *text) {
   const size_t length = strlen(text);
   return length == 0U ? 0U : static_cast<uint16_t>(length * 7U - 1U);
+}
+
+void sample_dashboard() {
+  SysDramStats_t ram{};
+  SysDramStats_t ccm{};
+  (void)SysDram_GetStats(SYSDRAM_REGION_RAM, &ram);
+  (void)SysDram_GetStats(SYSDRAM_REGION_CCM, &ccm);
+  constexpr uint32_t ram_total = 128U * 1024U;
+  constexpr uint32_t ccm_total = 64U * 1024U;
+  uint32_t ram_used = (ram_total > ram.total ? ram_total - ram.total : 0U) +
+                      ram.used;
+  uint32_t ccm_used = (ccm_total > ccm.total ? ccm_total - ccm.total : 0U) +
+                      ccm.used;
+  if (ram_used > ram_total) ram_used = ram_total;
+  if (ccm_used > ccm_total) ccm_used = ccm_total;
+  const unsigned ram_pct = (ram_used * 100U + ram_total / 2U) / ram_total;
+  const unsigned ccm_pct = (ccm_used * 100U + ccm_total / 2U) / ccm_total;
+  snprintf(dashboardPerf, sizeof(dashboardPerf), "FPS: %3uF | CPU: %3u%%",
+           static_cast<unsigned>(measuredFps > 999U ? 999U : measuredFps),
+           100U);
+  snprintf(dashboardMemory, sizeof(dashboardMemory),
+           "RAM: %3u%% | CRM: %3u%%", ram_pct, ccm_pct);
 }
 
 void draw_ascii12(uint16_t *pixels, uint16_t tile_y, uint16_t tile_h,
@@ -78,38 +102,23 @@ void draw_fps_overlay(uint16_t *pixels, uint16_t tile_y, uint16_t tile_h) {
   const uint16_t y0 = LCD_HEIGHT - 29U;
   if (tile_y + tile_h <= y0 || tile_y >= LCD_HEIGHT)
     return;
-  SysDramStats_t ram{};
-  SysDramStats_t ccm{};
-  (void)SysDram_GetStats(SYSDRAM_REGION_RAM, &ram);
-  (void)SysDram_GetStats(SYSDRAM_REGION_CCM, &ccm);
-  constexpr uint32_t ram_total = 128U * 1024U;
-  constexpr uint32_t ccm_total = 64U * 1024U;
-  uint32_t ram_used = (ram_total > ram.total ? ram_total - ram.total : 0U) +
-                      ram.used;
-  uint32_t ccm_used = (ccm_total > ccm.total ? ccm_total - ccm.total : 0U) +
-                      ccm.used;
-  if (ram_used > ram_total) ram_used = ram_total;
-  if (ccm_used > ccm_total) ccm_used = ccm_total;
-  const unsigned ram_pct = (ram_used * 100U + ram_total / 2U) / ram_total;
-  const unsigned ccm_pct = (ccm_used * 100U + ccm_total / 2U) / ccm_total;
-  char perf[28];
-  char memory[28];
-  snprintf(perf, sizeof(perf), "FPS: %3uF | CPU: %3u%%",
-           static_cast<unsigned>(measuredFps > 999U ? 999U : measuredFps),
-           100U);
-  snprintf(memory, sizeof(memory), "RAM: %3u%% | CRM: %3u%%", ram_pct,
-           ccm_pct);
-  const uint16_t perf_width = ascii12_string_width(perf);
-  const uint16_t memory_width = ascii12_string_width(memory);
+  const uint16_t perf_width = ascii12_string_width(dashboardPerf);
+  const uint16_t memory_width = ascii12_string_width(dashboardMemory);
   const uint16_t width =
       static_cast<uint16_t>((perf_width > memory_width ? perf_width
                                                         : memory_width) + 8U);
   const uint16_t x0 = static_cast<uint16_t>(LCD_WIDTH - width);
-  for (uint16_t y = y0; y < LCD_HEIGHT; ++y)
-    for (uint16_t x = x0; x < LCD_WIDTH; ++x)
-      video_put_pixel(pixels, tile_y, tile_h, x, y, 0x0000U);
-  draw_ascii12(pixels, tile_y, tile_h, x0 + 4U, y0 + 2U, perf, 0xE007U);
-  draw_ascii12(pixels, tile_y, tile_h, x0 + 4U, y0 + 15U, memory,
+  const uint32_t tile_pixels = static_cast<uint32_t>(LCD_WIDTH) * tile_h;
+  for (uint16_t y = y0; y < LCD_HEIGHT; ++y) {
+    const uint32_t logical = static_cast<uint32_t>(y - tile_y) * LCD_WIDTH;
+    uint16_t *span = boardLCD.getRotation() == 0U
+                         ? pixels + tile_pixels - logical - LCD_WIDTH
+                         : pixels + logical + x0;
+    memset(span, 0, static_cast<size_t>(width) * sizeof(uint16_t));
+  }
+  draw_ascii12(pixels, tile_y, tile_h, x0 + 4U, y0 + 2U, dashboardPerf,
+               0xE007U);
+  draw_ascii12(pixels, tile_y, tile_h, x0 + 4U, y0 + 15U, dashboardMemory,
                0xE0FFU);
 }
 
@@ -290,6 +299,7 @@ extern "C" LibVideoResult LibVideo_Play(const char *path, LibVideoPumpFn pump,
 
   const FSIZE_t first_frame = header.header_size;
   measuredFps = 0U;
+  sample_dashboard();
   do {
     if (f_lseek(&file, first_frame) != FR_OK) {
       f_close(&file);
@@ -340,6 +350,7 @@ extern "C" LibVideoResult LibVideo_Play(const char *path, LibVideoPumpFn pump,
       if (fps_elapsed >= 500U) {
         measuredFps = static_cast<uint16_t>(
             (fps_frames * 1000U + fps_elapsed / 2U) / fps_elapsed);
+        sample_dashboard();
         fps_frames = 0U;
         fps_sample_start = fps_now;
       }

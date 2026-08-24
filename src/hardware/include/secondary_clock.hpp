@@ -3,5 +3,6 @@
 
 void SecondaryClock_Init();
 void SecondaryClock_Tick();
+void SecondaryClock_SetDisplayOn(bool enabled);
 
 #endif

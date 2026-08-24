@@ -130,8 +130,8 @@ void display_activity_run(void) {
       if (editing) {
         if (edit_field == 1) {
           disp_bright--;
-          if (disp_bright < 0)
-            disp_bright = 0;
+          if (disp_bright < 1)
+            disp_bright = 1;
           apply(); /* live preview */
         } else if (edit_field == 3) {
           auto_close = false;

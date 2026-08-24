@@ -84,7 +84,7 @@ static uint8_t disp_sleep_delay_idx(void) {
 }
 
 static void sanitize(void) {
-  if (g_settings.disp_bright > 10U) {
+  if (g_settings.disp_bright == 0U || g_settings.disp_bright > 10U) {
     g_settings.disp_bright = 10U;
   }
   if (disp_sleep_delay_idx() > 5U) {
@@ -433,7 +433,7 @@ Settings_t *SM_Get(void) { return &g_settings; }
 
 uint8_t SM_Disp_Bright(void) { return g_settings.disp_bright; }
 void SM_Disp_SetBright(uint8_t v) {
-  if (v > 10U)
+  if (v == 0U || v > 10U)
     v = 10U;
   if (g_settings.disp_bright != v) {
     g_settings.disp_bright = v;
@@ -511,7 +511,7 @@ void SM_Disp_SetCloseDelay(uint8_t v) {
 }
 
 void SM_Disp_SetConfig(uint8_t bright, bool auto_close, uint8_t delay_idx) {
-  if (bright > 10U)
+  if (bright == 0U || bright > 10U)
     bright = 10U;
   if (delay_idx > 5U)
     delay_idx = 2U;

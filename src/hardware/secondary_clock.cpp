@@ -14,6 +14,7 @@ uint32_t lastForceRefreshMs = 0U;
 uint8_t pendingPage = 8U;
 uint8_t pageRetry = 0U;
 bool running = false;
+bool displayEnabled = false;
 
 bool displayFullBlocking() {
   return oled.display(frameBuffer, sizeof(frameBuffer));
@@ -59,6 +60,7 @@ void drawLogScreen(uint32_t seq) {
 
 void SecondaryClock_Init() {
   running = false;
+  displayEnabled = false;
   lastFrameMs = 0U;
   lastSeenSeq = 0U;
   lastForceRefreshMs = 0U;
@@ -78,11 +80,12 @@ void SecondaryClock_Init() {
   drawLogScreen(lastSeenSeq);
   (void)displayFullBlocking();
   (void)oled.setDisplayOn(true);
+  displayEnabled = true;
   startPagedRefresh();
 }
 
 void SecondaryClock_Tick() {
-  if (!running)
+  if (!running || !displayEnabled)
     return;
 
   servicePagedRefresh();
@@ -103,4 +106,22 @@ void SecondaryClock_Tick() {
   lastForceRefreshMs = now;
   drawLogScreen(seq);
   startPagedRefresh();
+}
+
+void SecondaryClock_SetDisplayOn(bool enabled) {
+  if (!running || displayEnabled == enabled)
+    return;
+  if (!oled.setDisplayOn(enabled))
+    return;
+  displayEnabled = enabled;
+  if (enabled) {
+    lastFrameMs = 0U;
+    lastForceRefreshMs = 0U;
+    lastSeenSeq = SysLog_OledSequence();
+    drawLogScreen(lastSeenSeq);
+    startPagedRefresh();
+  } else {
+    pendingPage = 8U;
+    pageRetry = 0U;
+  }
 }

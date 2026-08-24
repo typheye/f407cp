@@ -75,16 +75,11 @@ static void launcher_video_status(const char *text) {
   });
 }
 
-static void launcher_video_status_timeout(const char *text,
-                                          uint32_t duration_ms) {
+static void launcher_video_status_wait(const char *text,
+                                       VideoInputState *input) {
   launcher_video_status(text);
-  const uint32_t start = HAL_GetTick();
-  while (HAL_GetTick() - start < duration_ms) {
-    keyManager.tick();
-    TosApi_Tick();
-    SysWatchdog_Tick();
+  while (!launcher_video_pump(input))
     JPDelay(1U);
-  }
 }
 
 // ============ Animation state (CCMRAM to save main RAM) ============
@@ -955,7 +950,8 @@ void petLauncherRun(void) {
   LibVideoResult video_result = LIBVIDEO_NOT_FOUND;
   if (!FMCore_IsStorageMounted()) {
     LOG_W("PET", "TVID playback skipped: SD card is offline");
-    launcher_video_status_timeout("SD CARD OFFLINE", 900U);
+    launcher_video_status_wait("SD CARD OFFLINE", &video_input);
+    LCD_FLUSH({ EMO_FillScreen(EMO_BLACK); });
     return;
   }
 
@@ -969,7 +965,7 @@ void petLauncherRun(void) {
   }
   if (video_result != LIBVIDEO_OK) {
     LOG_W("PET", "TVID playback: %s", LibVideo_ResultText(video_result));
-    launcher_video_status_timeout(LibVideo_ResultText(video_result), 900U);
+    launcher_video_status_wait(LibVideo_ResultText(video_result), &video_input);
     LCD_FLUSH({ EMO_FillScreen(EMO_BLACK); });
     return;
   }
