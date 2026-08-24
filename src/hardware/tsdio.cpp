@@ -40,6 +40,14 @@ TSDIO boardSDIO;
 
 extern USART boardSerial;
 
+static void TSDIO_ResetHalHandle(void) {
+  if (hsd.Instance == SDIO && hsd.State != HAL_SD_STATE_RESET) {
+    (void)HAL_SD_DeInit(&hsd);
+  }
+  MX_SDIO_SD_Init();
+  __HAL_RCC_DMA2_CLK_ENABLE();
+}
+
 
 TSDIO::TSDIO() {
   _initialized = false;
@@ -94,6 +102,7 @@ SDCard_Status_t TSDIO::init(void) {
 
 
   LOG_I("SDIO", "Calling HAL_SD_Init...");
+  TSDIO_ResetHalHandle();
   if (HAL_SD_Init(&hsd) != HAL_OK) {
     LOG_E("SDIO", "HAL_SD_Init error code: 0x%08lX",
           (unsigned long)HAL_SD_GetError(&hsd));
@@ -589,6 +598,46 @@ extern "C" uint8_t BSP_SD_Init(void) {
   if (BSP_SD_IsDetected() != SD_PRESENT) {
     return MSD_ERROR;
   }
+  TSDIO_ResetHalHandle();
   return HAL_SD_Init(&hsd) == HAL_OK ? MSD_OK : MSD_ERROR;
+}
+
+extern "C" uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint32_t ReadAddr,
+                                      uint32_t NumOfBlocks, uint32_t Timeout) {
+  if (!pData || !boardSDIO.isInitialized() ||
+      HAL_SD_ReadBlocks(&hsd, (uint8_t *)pData, ReadAddr, NumOfBlocks,
+                        Timeout) != HAL_OK) return MSD_ERROR;
+  return boardSDIO.waitForReady(Timeout) ? MSD_OK : MSD_ERROR;
+}
+
+extern "C" uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint32_t WriteAddr,
+                                       uint32_t NumOfBlocks, uint32_t Timeout) {
+  if (!pData || !boardSDIO.isInitialized() ||
+      HAL_SD_WriteBlocks(&hsd, (uint8_t *)pData, WriteAddr, NumOfBlocks,
+                         Timeout) != HAL_OK) return MSD_ERROR;
+  return boardSDIO.waitForReady(Timeout) ? MSD_OK : MSD_ERROR;
+}
+
+extern "C" uint8_t BSP_SD_ReadBlocks_DMA(uint32_t *pData,
+                                           uint32_t ReadAddr,
+                                           uint32_t NumOfBlocks) {
+  if (!pData || !boardSDIO.isInitialized()) return MSD_ERROR;
+  return HAL_SD_ReadBlocks_DMA(&hsd, (uint8_t *)pData, ReadAddr,
+                               NumOfBlocks) == HAL_OK ? MSD_OK : MSD_ERROR;
+}
+
+extern "C" uint8_t BSP_SD_WriteBlocks_DMA(uint32_t *pData,
+                                            uint32_t WriteAddr,
+                                            uint32_t NumOfBlocks) {
+  return BSP_SD_WriteBlocks(pData, WriteAddr, NumOfBlocks, 3000U);
+}
+
+extern "C" uint8_t BSP_SD_GetCardState(void) {
+  return HAL_SD_GetCardState(&hsd) == HAL_SD_CARD_TRANSFER ?
+             SD_TRANSFER_OK : SD_TRANSFER_BUSY;
+}
+
+extern "C" void BSP_SD_GetCardInfo(HAL_SD_CardInfoTypeDef *CardInfo) {
+  if (CardInfo) (void)HAL_SD_GetCardInfo(&hsd, CardInfo);
 }
 

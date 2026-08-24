@@ -111,16 +111,13 @@ public:
 
   bool directWriteTest(void);
   bool simpleWriteTest(void);
+  bool waitForReady(uint32_t timeout_ms);
 
 private:
   bool _initialized;
   bool _hardDisabled;
   bool _writeProtected;
   SDCard_Info_t _cardInfo;
-
-
-  bool waitForReady(uint32_t timeout_ms);
-
 
   void updateCardInfo(void);
 };
