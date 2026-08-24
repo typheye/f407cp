@@ -15,9 +15,9 @@
 #define CCMRAM __attribute__((section(".ccmram")))
 
 #define SM_JSON_PATH "0:/data/settings.json"
-#define SM_JSON_TMP  "0:/data/settings.tmp"
-#define SM_JSON_MAX  384U
-#define SM_SELFTEST_TMP  "0:/data/_sm_probe.tmp"
+#define SM_JSON_TMP "0:/data/settings.tmp"
+#define SM_JSON_MAX 384U
+#define SM_SELFTEST_TMP "0:/data/_sm_probe.tmp"
 #define SM_SELFTEST_PATH "0:/data/_sm_probe.json"
 
 static CCMRAM Settings_t g_settings;
@@ -31,7 +31,8 @@ static uint32_t settings_crc(const Settings_t *settings) {
   for (size_t i = 0U; i < sizeof(*settings); ++i) {
     uint8_t value = (i >= offsetof(Settings_t, crc) &&
                      i < offsetof(Settings_t, crc) + sizeof(settings->crc))
-                        ? 0U : bytes[i];
+                        ? 0U
+                        : bytes[i];
     crc ^= value;
     for (uint32_t bit = 0U; bit < 8U; ++bit) {
       crc = (crc >> 1) ^ (0xEDB88320U & (0U - (crc & 1U)));
@@ -101,7 +102,7 @@ static void defaults(void) {
   g_settings.disp_bright = 10U;
   g_settings.disp_sleep_cfg = 0x04U;
   g_settings.debug_dashboard = 0U;
-  g_settings.debug_log_com = 0U;
+  g_settings.debug_log_com = 1U;
   g_settings.time_style_24h = true;
   g_settings.boot_gfx = true;
   g_settings.sound_mute = true;
@@ -129,9 +130,8 @@ static void settings_from_json(const char *json) {
       (uint8_t)json_get_int(json, "disp_bright", g_settings.disp_bright);
   g_settings.disp_sleep_cfg =
       (uint8_t)json_get_int(json, "disp_sleep_cfg", g_settings.disp_sleep_cfg);
-  g_settings.debug_dashboard =
-      (uint8_t)json_get_int(json, "debug_dashboard",
-                            g_settings.debug_dashboard);
+  g_settings.debug_dashboard = (uint8_t)json_get_int(
+      json, "debug_dashboard", g_settings.debug_dashboard);
   g_settings.debug_log_com =
       (uint8_t)json_get_int(json, "debug_log_com", g_settings.debug_log_com);
   g_settings.time_style_24h =
@@ -148,8 +148,10 @@ static bool read_json_file(char *buf, uint32_t cap, uint32_t *out_len) {
   UINT br = 0U;
   FRESULT res;
 
-  if (!buf || cap < 2U) return false;
-  if (out_len) *out_len = 0U;
+  if (!buf || cap < 2U)
+    return false;
+  if (out_len)
+    *out_len = 0U;
   buf[0] = '\0';
 
   res = f_stat(SM_JSON_PATH, &info);
@@ -170,12 +172,13 @@ static bool read_json_file(char *buf, uint32_t cap, uint32_t *out_len) {
   res = f_read(&file, buf, info.fsize, &br);
   (void)f_close(&file);
   if (res != FR_OK || br != info.fsize) {
-    sm_trace("json read failed: res=%d %lu/%lu", (int)res,
-             (unsigned long)br, (unsigned long)info.fsize);
+    sm_trace("json read failed: res=%d %lu/%lu", (int)res, (unsigned long)br,
+             (unsigned long)info.fsize);
     return false;
   }
   buf[br] = '\0';
-  if (out_len) *out_len = br;
+  if (out_len)
+    *out_len = br;
   return true;
 }
 
@@ -186,8 +189,10 @@ static bool read_file_exact(const char *path, char *buf, uint32_t cap,
   UINT br = 0U;
   FRESULT res;
 
-  if (!path || !buf || cap < 2U) return false;
-  if (out_len) *out_len = 0U;
+  if (!path || !buf || cap < 2U)
+    return false;
+  if (out_len)
+    *out_len = 0U;
   buf[0] = '\0';
 
   res = f_stat(path, &info);
@@ -209,24 +214,25 @@ static bool read_file_exact(const char *path, char *buf, uint32_t cap,
     return false;
   }
   buf[br] = '\0';
-  if (out_len) *out_len = br;
+  if (out_len)
+    *out_len = br;
   return true;
 }
 
 static void sm_json_selftest(void) {
   static bool ran = false;
-  const char *body =
-      "{\n"
-      "  \"schema\": 1,\n"
-      "  \"probe\": 407,\n"
-      "  \"ok\": true\n"
-      "}\n";
+  const char *body = "{\n"
+                     "  \"schema\": 1,\n"
+                     "  \"probe\": 407,\n"
+                     "  \"ok\": true\n"
+                     "}\n";
   char buf[128];
   FIL file;
   UINT bw = 0U;
   FRESULT res;
 
-  if (ran) return;
+  if (ran)
+    return;
   ran = true;
 
   sm_trace("probe start");
@@ -244,7 +250,8 @@ static void sm_json_selftest(void) {
   }
   {
     FRESULT close_res = f_close(&file);
-    if (res == FR_OK) res = close_res;
+    if (res == FR_OK)
+      res = close_res;
   }
   if (res != FR_OK || bw != strlen(body)) {
     sm_trace("probe tmp write failed: res=%d %lu/%lu", (int)res,
@@ -293,11 +300,11 @@ static bool load(void) {
   g_last_saved_crc = g_settings.crc;
   g_have_saved_crc = true;
   LOG_I("SMGR", "Loaded JSON from SD OK (%luB)", (unsigned long)len);
-  sm_trace("json loaded: bright=%u sleep=0x%02X dash=%u log=%u 24h=%u boot=%u mute=%u",
+  sm_trace("json loaded: bright=%u sleep=0x%02X dash=%u log=%u 24h=%u boot=%u "
+           "mute=%u",
            g_settings.disp_bright, g_settings.disp_sleep_cfg,
            g_settings.debug_dashboard, g_settings.debug_log_com,
-           g_settings.time_style_24h ? 1U : 0U,
-           g_settings.boot_gfx ? 1U : 0U,
+           g_settings.time_style_24h ? 1U : 0U, g_settings.boot_gfx ? 1U : 0U,
            g_settings.sound_mute ? 1U : 0U);
   return true;
 }
@@ -338,7 +345,8 @@ void SM_Save(void) {
   uint32_t start_ms = HAL_GetTick();
 
   sanitize();
-  if (g_sd_available && g_have_saved_crc && g_settings.crc == g_last_saved_crc) {
+  if (g_sd_available && g_have_saved_crc &&
+      g_settings.crc == g_last_saved_crc) {
     return;
   }
 
@@ -351,9 +359,9 @@ void SM_Save(void) {
   for (attempt = 0U; attempt < 2U; ++attempt) {
     res = attempt == 0U ? ensure_ready() : remount_ready();
     if (res != FR_OK) {
-      sm_trace("save ready failed: attempt=%u res=%d", attempt + 1U,
-               (int)res);
-      if (!retryable_fs_error(res)) return;
+      sm_trace("save ready failed: attempt=%u res=%d", attempt + 1U, (int)res);
+      if (!retryable_fs_error(res))
+        return;
       continue;
     }
 
@@ -362,7 +370,8 @@ void SM_Save(void) {
     if (res != FR_OK) {
       sm_trace("json tmp open failed: attempt=%u res=%d", attempt + 1U,
                (int)res);
-      if (!retryable_fs_error(res)) break;
+      if (!retryable_fs_error(res))
+        break;
       continue;
     }
 
@@ -373,12 +382,14 @@ void SM_Save(void) {
     }
     {
       FRESULT close_res = f_close(&file);
-      if (res == FR_OK) res = close_res;
+      if (res == FR_OK)
+        res = close_res;
     }
     if (res != FR_OK || bw != strlen(json)) {
-      sm_trace("json write failed: res=%d %lu/%lu", (int)res,
-               (unsigned long)bw, (unsigned long)strlen(json));
-      if (!retryable_fs_error(res)) break;
+      sm_trace("json write failed: res=%d %lu/%lu", (int)res, (unsigned long)bw,
+               (unsigned long)strlen(json));
+      if (!retryable_fs_error(res))
+        break;
       continue;
     }
 
@@ -386,14 +397,16 @@ void SM_Save(void) {
     res = f_rename(SM_JSON_TMP, SM_JSON_PATH);
     if (res != FR_OK) {
       sm_trace("json rename failed: %d", (int)res);
-      if (!retryable_fs_error(res)) break;
+      if (!retryable_fs_error(res))
+        break;
       continue;
     }
 
     if (read_json_file(verify, sizeof(verify), NULL) &&
         json_get_int(verify, "schema", 0) == 1 &&
         json_get_int(verify, "disp_bright", -1) == g_settings.disp_bright &&
-        json_get_int(verify, "disp_sleep_cfg", -1) == g_settings.disp_sleep_cfg) {
+        json_get_int(verify, "disp_sleep_cfg", -1) ==
+            g_settings.disp_sleep_cfg) {
       g_sd_available = true;
       g_last_saved_crc = g_settings.crc;
       g_have_saved_crc = true;
@@ -416,8 +429,10 @@ Settings_t *SM_Get(void) { return &g_settings; }
 
 uint8_t SM_Disp_Bright(void) { return g_settings.disp_bright; }
 void SM_Disp_SetBright(uint8_t v) {
-  if (v < 1U) v = 1U;
-  if (v > 10U) v = 10U;
+  if (v < 1U)
+    v = 1U;
+  if (v > 10U)
+    v = 10U;
   if (g_settings.disp_bright != v) {
     g_settings.disp_bright = v;
     SM_Save();
@@ -484,7 +499,8 @@ void SM_Disp_SetAutoClose(bool v) {
 uint8_t SM_Disp_CloseDelay(void) { return disp_sleep_delay_idx(); }
 
 void SM_Disp_SetCloseDelay(uint8_t v) {
-  if (v > 5U) v = 2U;
+  if (v > 5U)
+    v = 2U;
   uint8_t next = (uint8_t)((v << 1U) | (g_settings.disp_sleep_cfg & 0x01U));
   if (g_settings.disp_sleep_cfg != next) {
     g_settings.disp_sleep_cfg = next;
@@ -493,9 +509,12 @@ void SM_Disp_SetCloseDelay(uint8_t v) {
 }
 
 void SM_Disp_SetConfig(uint8_t bright, bool auto_close, uint8_t delay_idx) {
-  if (bright < 1U) bright = 1U;
-  if (bright > 10U) bright = 10U;
-  if (delay_idx > 5U) delay_idx = 2U;
+  if (bright < 1U)
+    bright = 1U;
+  if (bright > 10U)
+    bright = 10U;
+  if (delay_idx > 5U)
+    delay_idx = 2U;
   uint8_t next_sleep_cfg =
       (uint8_t)((delay_idx << 1U) | (auto_close ? 1U : 0U));
   if (g_settings.disp_bright != bright ||
