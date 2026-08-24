@@ -20,6 +20,9 @@ static bool g_boot_log_ready_seen;
 #define FMCORE_BOOT_LOG_TIMEOUT_MS 3500U
 #define FMCORE_LOG_DIR  "0:/storage/tos/log"
 #define FMCORE_DUMP_DIR "0:/storage/tos/dump"
+#define FMCORE_REC_DIR  "0:/storage/tos/rec"
+#define FMCORE_UPGRADE_DIR "0:/storage/tos/upgrade"
+#define FMCORE_FIRMWARE_DIR "0:/storage/tos/upgrade/firmware"
 
 typedef enum {
   FM_PATH_STORAGE = 0,
@@ -462,10 +465,30 @@ done:
 }
 
 bool FMCore_IsInitialized(void) {
+  FIL file;
   FILINFO info;
+  uint8_t buffer[512];
+  UINT read = 0U;
   if (!g_storage_mounted) return false;
   if (f_stat("0:/init", &info) != FR_OK || (info.fattrib & AM_DIR) != 0U) return false;
-  return info.fsize == TOS_SD_INIT_FILE_SIZE;
+  if (info.fsize != TOS_SD_INIT_FILE_SIZE) return false;
+  if (f_open(&file, "0:/init", FA_READ) != FR_OK) return false;
+  for (uint32_t offset = 0U; offset < TOS_SD_INIT_FILE_SIZE;
+       offset += sizeof(buffer)) {
+    if (f_read(&file, buffer, sizeof(buffer), &read) != FR_OK ||
+        read != sizeof(buffer)) {
+      (void)f_close(&file);
+      return false;
+    }
+    for (uint32_t i = 0U; i < sizeof(buffer); ++i) {
+      if (buffer[i] != 0xFFU) {
+        (void)f_close(&file);
+        return false;
+      }
+    }
+    SysWatchdog_Tick();
+  }
+  return f_close(&file) == FR_OK;
 }
 
 FRESULT FMCore_NextIndexedPath(const char *dir, const char *ext,
@@ -495,7 +518,25 @@ static FRESULT ensure_tos_dir(const char *leaf_dir) {
 }
 
 FRESULT FMCore_PrepareSystemStorage(void) {
-  FRESULT res = ensure_tos_dir(FMCORE_LOG_DIR);
+  FRESULT res;
+  /* Match REC's post-format layout.  /init remains REC-owned and is only
+   * validated by FMCore_IsInitialized; SYSTEM never fabricates it. */
+  if (!FMCore_IsInitialized()) return FR_NOT_READY;
+  res = f_mkdir("0:/data");
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir("0:/tmp");
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir("0:/storage");
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir("0:/storage/tos");
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir(FMCORE_REC_DIR);
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir(FMCORE_UPGRADE_DIR);
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir(FMCORE_FIRMWARE_DIR);
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = ensure_tos_dir(FMCORE_LOG_DIR);
   if (res != FR_OK) return res;
   return ensure_tos_dir(FMCORE_DUMP_DIR);
 }

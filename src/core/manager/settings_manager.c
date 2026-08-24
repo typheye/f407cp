@@ -56,6 +56,10 @@ static FRESULT ensure_ready(void) {
     sm_trace("mount storage failed: %d", (int)res);
     return res;
   }
+  if (!FMCore_IsInitialized()) {
+    sm_trace("0:/init marker invalid");
+    return FR_NOT_READY;
+  }
   res = f_mkdir("0:/data");
   if (res != FR_OK && res != FR_EXIST) {
     sm_trace("mkdir 0:/data failed: %d", (int)res);

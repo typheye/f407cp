@@ -11,12 +11,31 @@
 #include "hardware/include/key.hpp"
 #include "hardware/include/lcd.hpp"
 #include "hardware/include/secondary_clock.hpp"
+#include "hardware/include/sfhd.h"
 #include "hardware/include/tsdio.hpp"
 #include "library/include/libdly.h"
 #include "library/include/libpd.h"
 
 extern LED boardLed;
 extern Buzzer buzzer1;
+
+static void request_storage_init(void) {
+  if (!Flash_BL_RecoveryAvailable()) {
+    LOG_E("SDIO", "0:/init invalid and REC unavailable");
+    return;
+  }
+  FMCore_Unmount();
+  SysWatchdog_FeedNow();
+  if (Flash_BL_SetBootTarget(FLASH_BL_BOOT_RECOVERY_INIT) != FLASH_OK) {
+    LOG_E("SDIO", "failed to request REC storage initialization");
+    return;
+  }
+  LOG_W("SDIO", "0:/init invalid; rebooting to REC initialization");
+  __DSB();
+  __ISB();
+  NVIC_SystemReset();
+  while (1) __NOP();
+}
 
 void APP::init() {
   boardLed.init();
@@ -46,6 +65,9 @@ void APP::init() {
   if (sd_status == SD_CARD_OK) {
     FRESULT mount_res = FMCore_MountStorage(NULL, true);
     if (mount_res == FR_OK) {
+      if (!FMCore_IsInitialized()) {
+        request_storage_init();
+      }
       FRESULT prepare_res = FMCore_PrepareSystemStorage();
       if (prepare_res != FR_OK) {
         LOG_W("SDIO", "directory setup failed: %s(%d)",
