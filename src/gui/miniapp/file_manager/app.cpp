@@ -274,6 +274,8 @@ static void fm_format_permission(int idx, char *out, size_t out_sz) {
   if (out_sz == 0)
     return;
   const char *name = fm_items[idx];
+  const bool data_tree = strcmp(fm_cur_path, "/data") == 0 ||
+                         strncmp(fm_cur_path, "/data/", 6U) == 0;
   if (strcmp(fm_cur_path, "/") == 0) {
     if (strcmp(name, "init") == 0) {
       fm_copy_limited(out, out_sz, "rx", 2);
@@ -287,17 +289,13 @@ static void fm_format_permission(int idx, char *out, size_t out_sz) {
       fm_copy_limited(out, out_sz, "rwx", 3);
       return;
     }
-    if (strcmp(name, "tmp") == 0) {
-      fm_copy_limited(out, out_sz, "rw", 2);
-      return;
-    }
   }
   size_t n = 0;
   if (n + 1 < out_sz)
     out[n++] = 'r';
-  if ((fm_attr[idx] & AM_RDO) == 0 && n + 1 < out_sz)
+  if (!data_tree && (fm_attr[idx] & AM_RDO) == 0 && n + 1 < out_sz)
     out[n++] = 'w';
-  if (fm_is_dir[idx] && n + 1 < out_sz)
+  if (!data_tree && fm_is_dir[idx] && n + 1 < out_sz)
     out[n++] = 'x';
   out[n] = '\0';
 }
@@ -311,8 +309,7 @@ static bool fm_is_protected(int idx) {
     return false;
   return strcmp(fm_items[idx], "init") == 0 ||
          strcmp(fm_items[idx], "data") == 0 ||
-         strcmp(fm_items[idx], "storage") == 0 ||
-         strcmp(fm_items[idx], "tmp") == 0;
+         strcmp(fm_items[idx], "storage") == 0;
 }
 
 static void fm_show_information(int idx) {
@@ -338,12 +335,13 @@ static void fm_show_information(int idx) {
   fm_wait_keys_released(120);
 }
 
-static void fm_show_menu_frame(int sel, const char *const *items, int count) {
+static void fm_show_menu_frame(int sel, const char *const *items, int count,
+                               int disabled) {
   LCD_FLUSH({
     UI_DrawFrameTitle("FILE");
     PD_SetFont(FONT_ASCII_16);
     for (int i = 0; i < count; ++i)
-      UI_DrawMenuCard(i, sel, 33 + i * 25, items[i]);
+      UI_DrawMenuCardEx(i, sel, 33 + i * 25, items[i], i == disabled);
     PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
   });
 }
@@ -385,7 +383,7 @@ static int fm_open_folder_menu(int idx) {
     }
     if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
-      fm_show_menu_frame(sel, items, 3);
+      fm_show_menu_frame(sel, items, 3, -1);
     }
     JPDelay(1);
   }
@@ -397,6 +395,11 @@ static void fm_open_menu(int idx, int *sel_io) {
   static const char *protected_items[] = {"00 Return", "01 Information"};
   const char *const *items = fm_is_protected(idx) ? protected_items : full;
   int count = fm_is_protected(idx) ? 2 : 4;
+  char permission[8];
+  fm_format_permission(idx, permission, sizeof(permission));
+  const int disabled = (!fm_is_protected(idx) && strchr(permission, 'w') == NULL)
+                           ? 3
+                           : -1;
   int sel = 0;
   uint8_t enter_seen = 0;
   uint32_t lu = 0;
@@ -427,11 +430,7 @@ static void fm_open_menu(int idx, int *sel_io) {
         alert_show("FILE", "Stay tuned");
         return;
       } else if (!fm_is_protected(idx) && sel == 3) {
-        char perm[8];
-        fm_format_permission(idx, perm, sizeof(perm));
-        if (strchr(perm, 'w') == NULL) {
-          fm_wait_keys_released(120);
-          alert_show("FILE", "Permission denied");
+        if (disabled == 3) {
           return;
         } else {
           fm_wait_keys_released(120);
@@ -459,7 +458,7 @@ static void fm_open_menu(int idx, int *sel_io) {
     }
     if (HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
-      fm_show_menu_frame(sel, items, count);
+      fm_show_menu_frame(sel, items, count, disabled);
     }
     JPDelay(1);
   }

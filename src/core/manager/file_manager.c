@@ -7,6 +7,7 @@
  */
 
 #include "include/file_manager.h"
+#include "library/include/libtmp.h"
 #include "manifest.h"
 
 extern bool TSDIO_IsHardDisabled(void);
@@ -16,6 +17,7 @@ static bool g_storage_mounted;
 static FATFS g_storage_fs;
 static char g_boot_log_path[FMCORE_PATH_MAX];
 static bool g_boot_log_ready_seen;
+static bool g_temp_cleaned;
 
 #define FMCORE_BOOT_LOG_TIMEOUT_MS 3500U
 #define FMCORE_LOG_DIR  "0:/storage/tos/log"
@@ -26,7 +28,6 @@ static bool g_boot_log_ready_seen;
 
 typedef enum {
   FM_PATH_STORAGE = 0,
-  FM_PATH_TMP,
   FM_PATH_DATA,
   FM_PATH_INIT,
   FM_PATH_VIRTUAL_ROOT,
@@ -60,10 +61,6 @@ static FRESULT translate_path(const char *path, char *out, size_t out_sz,
     base = "0:/storage";
     suffix = path + strlen("/storage");
     if (kind) *kind = FM_PATH_STORAGE;
-  } else if (path_prefix(path, "/tmp")) {
-    base = "0:/tmp";
-    suffix = path + strlen("/tmp");
-    if (kind) *kind = FM_PATH_STORAGE;
   } else if (path_prefix(path, "/data")) {
     base = "0:/data";
     suffix = path + strlen("/data");
@@ -92,8 +89,7 @@ static FRESULT translate_path(const char *path, char *out, size_t out_sz,
 }
 
 static bool virtual_write_protected(FMPathKind kind) {
-  return kind == FM_PATH_TMP || kind == FM_PATH_VIRTUAL_ROOT ||
-         kind == FM_PATH_INIT;
+  return kind == FM_PATH_VIRTUAL_ROOT || kind == FM_PATH_INIT;
 }
 
 static void fatal_if_needed(FRESULT res, bool fatal_on_storage_error,
@@ -153,7 +149,7 @@ FRESULT FMCore_MountStorage(FATFS *fs, bool log_result) {
 
 FRESULT FMCore_Mount(FATFS *fs, bool fatal_on_storage_error) {
   FRESULT storage = FMCore_MountStorage(fs, true);
-  /* An absent SD leaves /storage empty; it must not make /data or /tmp fail. */
+  /* An absent SD leaves /storage empty; it must not make /data fail. */
   if (storage != FR_OK && storage != FR_NOT_READY) {
     LOG_W("FMCR", "external storage unavailable: %s(%d)",
           FMCore_FResultName(storage), (int)storage);
@@ -187,16 +183,15 @@ FRESULT FMCore_Stat(const char *path, FILINFO *info, bool fatal_on_storage_error
   if (!info) return FR_INVALID_PARAMETER;
   if (kind == FM_PATH_VIRTUAL_ROOT ||
       (kind == FM_PATH_STORAGE && strcmp(path, "/storage") == 0) ||
-      (kind == FM_PATH_TMP && strcmp(path, "/tmp") == 0) ||
       (kind == FM_PATH_DATA && strcmp(path, "/data") == 0)) {
     memset(info, 0, sizeof(*info));
-    info->fattrib = AM_DIR | (kind == FM_PATH_TMP || kind == FM_PATH_DATA ? AM_RDO : 0U);
+    info->fattrib = AM_DIR | (kind == FM_PATH_DATA ? AM_RDO : 0U);
     return FR_OK;
   }
   if ((kind == FM_PATH_STORAGE || kind == FM_PATH_INIT) && !g_storage_mounted) {
     return FR_NO_PATH;
   }
-  if (kind == FM_PATH_TMP || kind == FM_PATH_DATA) {
+  if (kind == FM_PATH_DATA) {
     return FR_NO_PATH;
   }
   res = f_stat(physical, info);
@@ -233,21 +228,17 @@ FRESULT FMCore_ListDir(const char *path, FMCore_Entry *entries, uint16_t max_ent
   if (res != FR_OK) return res;
 
   if (kind == FM_PATH_VIRTUAL_ROOT) {
-    static const char *const names[] = {"data", "storage", "tmp", "init"};
-    for (uint16_t i = 0U; i < 4U && count < max_entries; ++i) {
-      if (i == 3U && !FMCore_IsInitialized()) continue;
-      fill_virtual_entry(&entries[count++], names[i], i == 3U ? 0U : 1U,
-                         i == 3U ? TOS_SD_INIT_FILE_SIZE : 0U);
+    static const char *const names[] = {"data", "storage", "init"};
+    for (uint16_t i = 0U; i < 3U && count < max_entries; ++i) {
+      if (i == 2U && !FMCore_IsInitialized()) continue;
+      fill_virtual_entry(&entries[count++], names[i], i == 2U ? 0U : 1U,
+                         i == 2U ? TOS_SD_INIT_FILE_SIZE : 0U);
     }
     if (out_count) *out_count = count;
     return FR_OK;
   }
   if ((kind == FM_PATH_STORAGE || kind == FM_PATH_DATA) &&
       !g_storage_mounted) {
-    if (out_count) *out_count = 0U;
-    return FR_OK;
-  }
-  if (kind == FM_PATH_TMP) {
     if (out_count) *out_count = 0U;
     return FR_OK;
   }
@@ -330,7 +321,6 @@ FRESULT FMCore_ReadFile(const char *path, void *buf, uint32_t max_len,
   if (!buf || max_len == 0U) return FR_INVALID_PARAMETER;
   res = translate_path(path, physical, sizeof(physical), &kind);
   if (res != FR_OK || kind == FM_PATH_VIRTUAL_ROOT) return FR_INVALID_OBJECT;
-  if (kind == FM_PATH_TMP) return FR_NO_PATH;
   res = f_open(&fp, physical, FA_READ);
   if (res == FR_OK) {
     res = f_read(&fp, buf, (UINT)max_len, &br);
@@ -433,7 +423,7 @@ static bool root_name_is(const char *name, const char *expected) {
 
 static bool root_entry_is_kept(const char *name) {
   return root_name_is(name, "data") || root_name_is(name, "storage") ||
-         root_name_is(name, "tmp") || root_name_is(name, "init");
+         root_name_is(name, "init");
 }
 
 static FRESULT repair_storage_root(void) {
@@ -571,8 +561,17 @@ FRESULT FMCore_PrepareSystemStorage(void) {
   if (res != FR_OK) return res;
   res = f_mkdir("0:/data");
   if (res != FR_OK && res != FR_EXIST) return res;
-  res = f_mkdir("0:/tmp");
+  res = f_mkdir("0:/data/system");
   if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir("0:/data/app");
+  if (res != FR_OK && res != FR_EXIST) return res;
+  res = f_mkdir("0:/data/temp");
+  if (res != FR_OK && res != FR_EXIST) return res;
+  if (!g_temp_cleaned) {
+    res = LibTmp_Cleanup();
+    if (res != FR_OK) return res;
+    g_temp_cleaned = true;
+  }
   res = f_mkdir("0:/storage");
   if (res != FR_OK && res != FR_EXIST) return res;
   res = f_mkdir("0:/storage/tos");

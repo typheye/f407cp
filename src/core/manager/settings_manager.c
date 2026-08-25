@@ -9,16 +9,15 @@
 #include "core/manager/include/file_manager.h"
 #include "ff.h"
 #include "library/include/libjson.h"
+#include "library/include/libcry.h"
+#include "library/include/libtmp.h"
 #include <stdarg.h>
 #include <stddef.h>
 
 #define CCMRAM __attribute__((section(".ccmram")))
 
-#define SM_JSON_PATH "0:/data/settings.json"
-#define SM_JSON_TMP "0:/data/settings.tmp"
+#define SM_JSON_PATH "0:/data/system/settings.dat"
 #define SM_JSON_MAX 384U
-#define SM_SELFTEST_TMP "0:/data/_sm_probe.tmp"
-#define SM_SELFTEST_PATH "0:/data/_sm_probe.json"
 
 static CCMRAM Settings_t g_settings;
 static bool g_sd_available = false;
@@ -63,6 +62,11 @@ static FRESULT ensure_ready(void) {
   res = f_mkdir("0:/data");
   if (res != FR_OK && res != FR_EXIST) {
     sm_trace("mkdir 0:/data failed: %d", (int)res);
+    return res;
+  }
+  res = f_mkdir("0:/data/system");
+  if (res != FR_OK && res != FR_EXIST) {
+    sm_trace("mkdir 0:/data/system failed: %d", (int)res);
     return res;
   }
   return FR_OK;
@@ -166,29 +170,33 @@ static bool read_json_file(char *buf, uint32_t cap, uint32_t *out_len) {
 
   res = f_stat(SM_JSON_PATH, &info);
   if (res != FR_OK) {
-    sm_trace("json stat failed: %d", (int)res);
+    sm_trace("settings dat stat failed: %d", (int)res);
     return false;
   }
-  if (info.fsize == 0U || info.fsize >= cap) {
+  if (info.fsize < LIBCRY_OVERHEAD || info.fsize > cap + LIBCRY_OVERHEAD) {
     sm_trace("json size invalid: %lu", (unsigned long)info.fsize);
     return false;
   }
-
+  uint8_t sealed[SM_JSON_MAX + LIBCRY_OVERHEAD];
   res = f_open(&file, SM_JSON_PATH, FA_READ);
   if (res != FR_OK) {
     sm_trace("json open failed: %d", (int)res);
     return false;
   }
-  res = f_read(&file, buf, info.fsize, &br);
+  res = f_read(&file, sealed, info.fsize, &br);
   (void)f_close(&file);
   if (res != FR_OK || br != info.fsize) {
     sm_trace("json read failed: res=%d %lu/%lu", (int)res, (unsigned long)br,
              (unsigned long)info.fsize);
     return false;
   }
-  buf[br] = '\0';
-  if (out_len)
-    *out_len = br;
+  uint32_t plain_len = 0U;
+  if (!LibCry_Open(sealed, br, buf, cap - 1U, &plain_len)) {
+    sm_trace("settings dat authentication failed");
+    return false;
+  }
+  buf[plain_len] = '\0';
+  if (out_len) *out_len = plain_len;
   return true;
 }
 
@@ -240,16 +248,21 @@ static void sm_json_selftest(void) {
   FIL file;
   UINT bw = 0U;
   FRESULT res;
+  char tmp_path[48];
+  char final_path[48];
 
   if (ran)
     return;
   ran = true;
 
   sm_trace("probe start");
-  (void)f_unlink(SM_SELFTEST_TMP);
-  (void)f_unlink(SM_SELFTEST_PATH);
+  if (!LibTmp_CreatePath(tmp_path, sizeof(tmp_path)) ||
+      !LibTmp_CreatePath(final_path, sizeof(final_path))) {
+    sm_trace("probe temp path allocation failed");
+    return;
+  }
 
-  res = f_open(&file, SM_SELFTEST_TMP, FA_CREATE_ALWAYS | FA_WRITE);
+  res = f_open(&file, tmp_path, FA_CREATE_NEW | FA_WRITE);
   if (res != FR_OK) {
     sm_trace("probe tmp open failed: %d", (int)res);
     return;
@@ -268,7 +281,7 @@ static void sm_json_selftest(void) {
              (unsigned long)bw, (unsigned long)strlen(body));
     return;
   }
-  if (!read_file_exact(SM_SELFTEST_TMP, buf, sizeof(buf), NULL) ||
+  if (!read_file_exact(tmp_path, buf, sizeof(buf), NULL) ||
       json_get_int(buf, "probe", 0) != 407 ||
       !json_get_bool(buf, "ok", false)) {
     sm_trace("probe tmp verify failed");
@@ -276,12 +289,12 @@ static void sm_json_selftest(void) {
   }
   sm_trace("probe tmp verified");
 
-  res = f_rename(SM_SELFTEST_TMP, SM_SELFTEST_PATH);
+  res = f_rename(tmp_path, final_path);
   if (res != FR_OK) {
     sm_trace("probe rename failed: %d", (int)res);
     return;
   }
-  if (!read_file_exact(SM_SELFTEST_PATH, buf, sizeof(buf), NULL) ||
+  if (!read_file_exact(final_path, buf, sizeof(buf), NULL) ||
       json_get_int(buf, "probe", 0) != 407 ||
       !json_get_bool(buf, "ok", false)) {
     sm_trace("probe final verify failed");
@@ -289,7 +302,7 @@ static void sm_json_selftest(void) {
   }
   sm_trace("probe final verified");
 
-  res = f_unlink(SM_SELFTEST_PATH);
+  res = f_unlink(final_path);
   sm_trace("probe delete %s: %d", res == FR_OK ? "ok" : "failed", (int)res);
 }
 
@@ -309,7 +322,7 @@ static bool load(void) {
   settings_from_json(json);
   g_last_saved_crc = g_settings.crc;
   g_have_saved_crc = true;
-  LOG_I("SMGR", "Loaded JSON from SD OK (%luB)", (unsigned long)len);
+  LOG_I("SMGR", "Loaded encrypted settings OK (%luB)", (unsigned long)len);
   sm_trace("json loaded: bright=%u sleep=0x%02X dash=%u log=%u 24h=%u boot=%u "
            "mute=%u oled=%u",
            g_settings.disp_bright, g_settings.disp_sleep_cfg,
@@ -340,7 +353,7 @@ void SM_Mount(void) {
   sm_json_selftest();
 
   if (!load()) {
-    LOG_W("SMGR", "Load JSON failed, using defaults");
+    LOG_W("SMGR", "Load settings.dat failed, using defaults");
     SM_Save();
   }
 }
@@ -348,11 +361,14 @@ void SM_Mount(void) {
 void SM_Save(void) {
   FIL file;
   char json[SM_JSON_MAX];
+  uint8_t sealed[SM_JSON_MAX + LIBCRY_OVERHEAD];
   char verify[SM_JSON_MAX];
   UINT bw = 0U;
+  uint32_t sealed_len = 0U;
   FRESULT res = FR_OK;
   uint8_t attempt = 0U;
   uint32_t start_ms = HAL_GetTick();
+  char tmp_path[48] = {0};
 
   sanitize();
   if (g_sd_available && g_have_saved_crc &&
@@ -362,6 +378,11 @@ void SM_Save(void) {
 
   if (!settings_to_json(json, sizeof(json))) {
     sm_trace("json build failed");
+    return;
+  }
+  if (!LibCry_Seal(json, (uint32_t)strlen(json), sealed, sizeof(sealed),
+                   &sealed_len)) {
+    sm_trace("settings dat encryption failed");
     return;
   }
 
@@ -375,8 +396,11 @@ void SM_Save(void) {
       continue;
     }
 
-    (void)f_unlink(SM_JSON_TMP);
-    res = f_open(&file, SM_JSON_TMP, FA_CREATE_ALWAYS | FA_WRITE);
+    if (!LibTmp_CreatePath(tmp_path, sizeof(tmp_path))) {
+      sm_trace("json temp path allocation failed");
+      break;
+    }
+    res = f_open(&file, tmp_path, FA_CREATE_NEW | FA_WRITE);
     if (res != FR_OK) {
       sm_trace("json tmp open failed: attempt=%u res=%d", attempt + 1U,
                (int)res);
@@ -386,8 +410,8 @@ void SM_Save(void) {
     }
 
     bw = 0U;
-    res = f_write(&file, json, (UINT)strlen(json), &bw);
-    if (res == FR_OK && bw == strlen(json)) {
+    res = f_write(&file, sealed, (UINT)sealed_len, &bw);
+    if (res == FR_OK && bw == sealed_len) {
       res = f_sync(&file);
     }
     {
@@ -395,16 +419,16 @@ void SM_Save(void) {
       if (res == FR_OK)
         res = close_res;
     }
-    if (res != FR_OK || bw != strlen(json)) {
+    if (res != FR_OK || bw != sealed_len) {
       sm_trace("json write failed: res=%d %lu/%lu", (int)res, (unsigned long)bw,
-               (unsigned long)strlen(json));
+               (unsigned long)sealed_len);
       if (!retryable_fs_error(res))
         break;
       continue;
     }
 
     (void)f_unlink(SM_JSON_PATH);
-    res = f_rename(SM_JSON_TMP, SM_JSON_PATH);
+    res = f_rename(tmp_path, SM_JSON_PATH);
     if (res != FR_OK) {
       sm_trace("json rename failed: %d", (int)res);
       if (!retryable_fs_error(res))
@@ -421,12 +445,14 @@ void SM_Save(void) {
       g_sd_available = true;
       g_last_saved_crc = g_settings.crc;
       g_have_saved_crc = true;
-      sm_trace("json saved+verified ok: %luB", (unsigned long)strlen(json));
+      sm_trace("settings dat saved+verified ok: %luB", (unsigned long)sealed_len);
       break;
     }
 
     sm_trace("json verify failed");
   }
+
+  if (tmp_path[0] != '\0') (void)f_unlink(tmp_path);
 
   {
     uint32_t elapsed = HAL_GetTick() - start_ms;
