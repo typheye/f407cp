@@ -34,6 +34,7 @@ static void app_menu(const AppManager_App *app, uint16_t index) {
       if (sel == 0) return;
       if (sel == 1) {
         app_info(app);
+        return;
       } else if (sel == 2 && app->can_hide) {
         if (confirm_show("APP", app->hidden ? "Need to display application?"
                                              : "Need to hide application?"))
@@ -42,6 +43,8 @@ static void app_menu(const AppManager_App *app, uint16_t index) {
       } else if (sel == 3 && app->can_uninstall) {
         if (confirm_show("APP", "Need to uninstall the application?"))
           (void)AppManager_Uninstall(index);
+        return;
+      } else {
         return;
       }
     }
@@ -58,12 +61,26 @@ static void app_menu(const AppManager_App *app, uint16_t index) {
   }
 }
 
+static int app_ordered_index(const uint16_t *order, uint16_t count, int pos) {
+  return pos >= 0 && pos < (int)count ? (int)order[pos] : -1;
+}
+
 void application_activity_run(void) {
   (void)AppManager_Init();
   int sel = 0;
   uint8_t last_enter = 0U;
   while (1) {
     const uint16_t count = AppManager_Count();
+    uint16_t order[APP_MANAGER_MAX];
+    uint16_t order_count = 0U;
+    for (uint16_t pass = 0U; pass < 2U; ++pass) {
+      for (uint16_t i = 0U; i < count; ++i) {
+        const AppManager_App *app = AppManager_Get(i);
+        if (app && ((pass == 0U && !app->hidden) ||
+                    (pass == 1U && app->hidden)))
+          order[order_count++] = i;
+      }
+    }
     const int total = (int)count + 1;
     if (sel >= total) sel = 0;
     TosApi_Tick();
@@ -75,8 +92,9 @@ void application_activity_run(void) {
     uint8_t enter = keyManager._btnEnter.getState() == KEY_PRESSED;
     if (enter && !last_enter) {
       if (sel == 0) return;
-      const AppManager_App *app = AppManager_Get((uint16_t)(sel - 1));
-      if (app) app_menu(app, (uint16_t)(sel - 1));
+      const int ordered = app_ordered_index(order, order_count, sel - 1);
+      const AppManager_App *app = ordered >= 0 ? AppManager_Get((uint16_t)ordered) : NULL;
+      if (app) app_menu(app, (uint16_t)ordered);
     }
     last_enter = enter;
     LCD_FLUSH({
@@ -88,10 +106,12 @@ void application_activity_run(void) {
         if (idx == 0) {
           UI_DrawMenuCard(idx, sel, 33 + i * 25, "00 Return");
         } else {
-          const AppManager_App *app = AppManager_Get((uint16_t)(idx - 1));
+          const int ordered = app_ordered_index(order, order_count, idx - 1);
+          const AppManager_App *app = ordered >= 0 ? AppManager_Get((uint16_t)ordered) : NULL;
           char label[40];
           snprintf(label, sizeof(label), "   %s", app ? app->name : "");
-          UI_DrawMenuCard(idx, sel, 33 + i * 25, label);
+          UI_DrawMenuCardEx(idx, sel, 33 + i * 25, label,
+                            app && app->hidden);
         }
       }
       PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");

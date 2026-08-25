@@ -38,8 +38,21 @@ static uint16_t launcher_visible(uint16_t *indices, uint16_t cap) {
   return count;
 }
 
-static const char *launcher_name(const AppManager_App *app) {
-  return strcmp(app->package_name, "tos.file") == 0 ? "Explorer" : app->name;
+static const char *launcher_fit_name(const char *name) {
+  static char out[24];
+  strncpy(out, name ? name : "", sizeof(out) - 1U);
+  out[sizeof(out) - 1U] = '\0';
+  if (PD_GetStringWidth(out) <= 68U) return out;
+  size_t len = strlen(out);
+  while (len > 3U) {
+    out[len - 3U] = '.';
+    out[len - 2U] = '.';
+    out[len - 1U] = '.';
+    out[len] = '\0';
+    if (PD_GetStringWidth(out) <= 68U) return out;
+    --len;
+  }
+  return "...";
 }
 
 static void launcher_draw(int sel, const uint16_t *visible,
@@ -61,7 +74,8 @@ static void launcher_draw(int sel, const uint16_t *visible,
       const int16_t x = x0 + (slot % 3) * 75;
       const int16_t y = y0 + (slot / 3) * 76;
       const bool selected = item == sel;
-      const char *name = launcher_name(app);
+      PD_SetFont(FONT_ASCII_12);
+      const char *name = launcher_fit_name(app->name);
 
       PD_FillRect(x + 16, y + 3, 36, 36,
                   selected ? TOS_TEXT : TOS_ACCENT);
@@ -73,7 +87,7 @@ static void launcher_draw(int sel, const uint16_t *visible,
 
       char initial[2] = {name[0], '\0'};
       PD_SetColor(selected ? TOS_ACCENT : TOS_BG);
-      PD_SetFont(FONT_ASCII_16);
+      PD_SetFont(FONT_ASCII_24);
       PD_DrawStringCentered(x + 16, y + 3, 36, 36, initial);
       PD_SetColor(selected ? TOS_TEXT : TOS_TEXT_SEC);
       PD_SetFont(FONT_ASCII_12);
@@ -81,7 +95,7 @@ static void launcher_draw(int sel, const uint16_t *visible,
     }
 
     const int16_t track_x = 90;
-    const int16_t track_y = 202;
+    const int16_t track_y = 190;
     const int16_t track_w = 60;
     const int16_t gap = 3;
     const int16_t thumb_w = (track_w - (pages - 1) * gap) / pages;
