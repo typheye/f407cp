@@ -380,7 +380,7 @@ static int fm_open_folder_menu(int idx) {
       if (sel == 2)
         return -1;
       fm_show_information(idx);
-      fm_wait_keys_released(120);
+      return -1;
     } else if (!ce) {
       enter_seen = 0;
     }
@@ -422,15 +422,18 @@ static void fm_open_menu(int idx, int *sel_io) {
       if ((fm_is_protected(idx) && sel == 1) ||
           (!fm_is_protected(idx) && sel == 2)) {
         fm_show_information(idx);
+        return;
       } else if (!fm_is_protected(idx) && sel == 1) {
         fm_wait_keys_released(120);
         alert_show("FILE", "Stay tuned");
+        return;
       } else if (!fm_is_protected(idx) && sel == 3) {
         char perm[8];
         fm_format_permission(idx, perm, sizeof(perm));
         if (strchr(perm, 'w') == NULL) {
           fm_wait_keys_released(120);
           alert_show("FILE", "Permission denied");
+          return;
         } else {
           fm_wait_keys_released(120);
           if (confirm_show("FILE", "Confirm to delete the file or folder?")) {
@@ -446,7 +449,9 @@ static void fm_open_menu(int idx, int *sel_io) {
             char err[48];
             snprintf(err, sizeof(err), "Delete failed (%d)", (int)res);
             alert_show("FILE", err);
+            return;
           }
+          return;
         }
       }
       fm_wait_keys_released(120);
