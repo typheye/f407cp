@@ -22,8 +22,11 @@
 
 #include "include/app.h"
 #include "dram.h"
+#include "gui/components/include/alert.hpp"
+#include "gui/components/include/confirm.hpp"
 #include "library/include/libdly.h"
 #include "library/include/libui.h"
+
 
 extern KeyManager keyManager;
 extern LCD boardLCD;
@@ -36,10 +39,13 @@ extern LCD boardLCD;
 
 static FATFS fm_fs;
 static bool fm_mounted = false;
+static void fm_load_dir(void);
 
 static char *fm_cur_path = nullptr;
 static char (*fm_items)[FM_NAME_LEN] = nullptr;
 static int *fm_is_dir = nullptr;
+static uint32_t *fm_size = nullptr;
+static uint8_t *fm_attr = nullptr;
 static int fm_count = 0;
 
 /* When entering a child directory, remember the selected child index in the
@@ -49,18 +55,24 @@ static int *fm_parent_sel_stack = nullptr;
 static int fm_stack_depth = 0;
 
 static bool fm_alloc_context(void) {
-  if (fm_cur_path && fm_items && fm_is_dir && fm_parent_sel_stack)
+  if (fm_cur_path && fm_items && fm_is_dir && fm_size && fm_attr &&
+      fm_parent_sel_stack)
     return true;
 
   fm_cur_path = (char *)SysDram_Alloc(FM_PATH_LEN);
   fm_items = (char (*)[FM_NAME_LEN])SysDram_Alloc(FM_MAX_ITEMS * FM_NAME_LEN);
   fm_is_dir = (int *)SysDram_Alloc(FM_MAX_ITEMS * sizeof(int));
+  fm_size = (uint32_t *)SysDram_Alloc(FM_MAX_ITEMS * sizeof(uint32_t));
+  fm_attr = (uint8_t *)SysDram_Alloc(FM_MAX_ITEMS * sizeof(uint8_t));
   fm_parent_sel_stack = (int *)SysDram_Alloc(FM_STACK_DEPTH * sizeof(int));
 
-  if (fm_cur_path && fm_items && fm_is_dir && fm_parent_sel_stack) {
+  if (fm_cur_path && fm_items && fm_is_dir && fm_size && fm_attr &&
+      fm_parent_sel_stack) {
     strcpy(fm_cur_path, "0:");
     memset(fm_items, 0, FM_MAX_ITEMS * FM_NAME_LEN);
     memset(fm_is_dir, 0, FM_MAX_ITEMS * sizeof(int));
+    memset(fm_size, 0, FM_MAX_ITEMS * sizeof(uint32_t));
+    memset(fm_attr, 0, FM_MAX_ITEMS * sizeof(uint8_t));
     memset(fm_parent_sel_stack, 0, FM_STACK_DEPTH * sizeof(int));
     fm_count = 0;
     fm_stack_depth = 0;
@@ -70,10 +82,14 @@ static bool fm_alloc_context(void) {
   SysDram_Free(fm_cur_path);
   SysDram_Free(fm_items);
   SysDram_Free(fm_is_dir);
+  SysDram_Free(fm_size);
+  SysDram_Free(fm_attr);
   SysDram_Free(fm_parent_sel_stack);
   fm_cur_path = nullptr;
   fm_items = nullptr;
   fm_is_dir = nullptr;
+  fm_size = nullptr;
+  fm_attr = nullptr;
   fm_parent_sel_stack = nullptr;
   fm_count = 0;
   fm_stack_depth = 0;
@@ -83,10 +99,14 @@ static bool fm_alloc_context(void) {
 static void fm_free_context(void) {
   SysDram_Free(fm_parent_sel_stack);
   SysDram_Free(fm_is_dir);
+  SysDram_Free(fm_size);
+  SysDram_Free(fm_attr);
   SysDram_Free(fm_items);
   SysDram_Free(fm_cur_path);
   fm_parent_sel_stack = nullptr;
   fm_is_dir = nullptr;
+  fm_size = nullptr;
+  fm_attr = nullptr;
   fm_items = nullptr;
   fm_cur_path = nullptr;
   fm_count = 0;
@@ -231,7 +251,7 @@ static void fm_wrap_for_alert(const char *path, char *out, size_t out_sz) {
   size_t op = 0;
   size_t col = 0;
 
-  const char *prefix = "Path:\n";
+  const char *prefix = "[Path]\n";
   for (const char *p = prefix; *p && op + 1 < out_sz; ++p) {
     out[op++] = *p;
   }
@@ -251,17 +271,194 @@ static void fm_wrap_for_alert(const char *path, char *out, size_t out_sz) {
   out[op] = '\0';
 }
 
-static void fm_show_file_path(const char *name) {
-  char full[FM_PATH_LEN + FM_NAME_LEN];
-  char msg[FM_PATH_LEN + FM_NAME_LEN + 16];
+static void fm_format_permission(int idx, char *out, size_t out_sz) {
+  if (out_sz == 0)
+    return;
+  const char *name = fm_items[idx];
+  if (strcmp(fm_cur_path, "/") == 0) {
+    if (strcmp(name, "init") == 0) {
+      fm_copy_limited(out, out_sz, "rx", 2);
+      return;
+    }
+    if (strcmp(name, "data") == 0) {
+      fm_copy_limited(out, out_sz, "r", 1);
+      return;
+    }
+    if (strcmp(name, "storage") == 0) {
+      fm_copy_limited(out, out_sz, "rwx", 3);
+      return;
+    }
+    if (strcmp(name, "tmp") == 0) {
+      fm_copy_limited(out, out_sz, "rw", 2);
+      return;
+    }
+  }
+  size_t n = 0;
+  if (n + 1 < out_sz)
+    out[n++] = 'r';
+  if ((fm_attr[idx] & AM_RDO) == 0 && n + 1 < out_sz)
+    out[n++] = 'w';
+  if (fm_is_dir[idx] && n + 1 < out_sz)
+    out[n++] = 'x';
+  out[n] = '\0';
+}
 
-  fm_build_full_path(name, full, sizeof(full));
-  fm_wrap_for_alert(full, msg, sizeof(msg));
+static bool fm_is_protected(int idx) {
+  if (idx < 0 || idx >= fm_count)
+    return true;
+  if (strcmp(fm_items[idx], "..") == 0)
+    return true;
+  if (strcmp(fm_cur_path, "/") != 0)
+    return false;
+  return strcmp(fm_items[idx], "init") == 0 ||
+         strcmp(fm_items[idx], "data") == 0 ||
+         strcmp(fm_items[idx], "storage") == 0 ||
+         strcmp(fm_items[idx], "tmp") == 0;
+}
 
-  LOG_I("FILE", "selected file: %s", full);
-  fm_wait_keys_released(600);
+static void fm_show_information(int idx) {
+  char msg[256];
+  if (strcmp(fm_items[idx], "..") == 0) {
+    char full_path[FM_PATH_LEN + 3];
+    snprintf(full_path, sizeof(full_path), "0:%s", fm_cur_path);
+    fm_wrap_for_alert(full_path, msg, sizeof(msg));
+  } else {
+    char perm[8];
+    fm_format_permission(idx, perm, sizeof(perm));
+    if (fm_is_dir[idx]) {
+      snprintf(msg, sizeof(msg), "[Folder Name]\n%s\n[Folder Permission]\n%s",
+               fm_items[idx], perm);
+    } else {
+      snprintf(msg, sizeof(msg),
+               "[File Name]\n%s\n[File Size]\n%lu B\n[File Permission]\n%s",
+               fm_items[idx], (unsigned long)fm_size[idx], perm);
+    }
+  }
+  fm_wait_keys_released(120);
   alert_show("FILE", msg);
-  fm_wait_keys_released(600);
+  fm_wait_keys_released(120);
+}
+
+static void fm_show_menu_frame(int sel, const char *const *items, int count) {
+  LCD_FLUSH({
+    UI_DrawFrameTitle("FILE");
+    PD_SetFont(FONT_ASCII_16);
+    for (int i = 0; i < count; ++i)
+      UI_DrawMenuCard(i, sel, 33 + i * 25, items[i]);
+    PD_DrawFooterCenter("ENTER", NULL, "UP/DOWN");
+  });
+}
+
+static int fm_open_folder_menu(int idx) {
+  static const char *folder_items[] = {"00 Open", "01 Information",
+                                       "02 Cancel"};
+  static const char *upper_items[] = {"00 Upper", "01 Information",
+                                      "02 Cancel"};
+  const char *const *items =
+      strcmp(fm_items[idx], "..") == 0 ? upper_items : folder_items;
+  int sel = 0;
+  uint8_t enter_seen = 0;
+  uint32_t lu = 0;
+  while (1) {
+    TosApi_Tick();
+    keyManager._collisionA8.tick();
+    keyManager._collisionD0.tick();
+    keyManager._btnEnter.tick();
+    if (keyManager._collisionA8.getState() == KEY_PRESSED) {
+      sel = (sel + 1) % 3;
+      JPDelay(2);
+    }
+    if (keyManager._collisionD0.getState() == KEY_PRESSED) {
+      sel = (sel + 2) % 3;
+      JPDelay(2);
+    }
+    uint8_t ce = keyManager._btnEnter.getState() == KEY_PRESSED;
+    if (ce && !enter_seen) {
+      enter_seen = 1;
+      if (sel == 0)
+        return 0;
+      if (sel == 2)
+        return -1;
+      fm_show_information(idx);
+      fm_wait_keys_released(120);
+    } else if (!ce) {
+      enter_seen = 0;
+    }
+    if (HAL_GetTick() - lu > 80U) {
+      lu = HAL_GetTick();
+      fm_show_menu_frame(sel, items, 3);
+    }
+    JPDelay(1);
+  }
+}
+
+static void fm_open_menu(int idx, int *sel_io) {
+  static const char *full[] = {"00 Return", "01 Open/Run", "02 Information",
+                               "03 Delete"};
+  static const char *protected_items[] = {"00 Return", "01 Information"};
+  const char *const *items = fm_is_protected(idx) ? protected_items : full;
+  int count = fm_is_protected(idx) ? 2 : 4;
+  int sel = 0;
+  uint8_t enter_seen = 0;
+  uint32_t lu = 0;
+  while (1) {
+    TosApi_Tick();
+    keyManager._collisionA8.tick();
+    keyManager._collisionD0.tick();
+    keyManager._btnEnter.tick();
+    if (keyManager._collisionA8.getState() == KEY_PRESSED) {
+      sel = (sel + 1) % count;
+      JPDelay(2);
+    }
+    if (keyManager._collisionD0.getState() == KEY_PRESSED) {
+      sel = (sel + count - 1) % count;
+      JPDelay(2);
+    }
+    uint8_t ce = keyManager._btnEnter.getState() == KEY_PRESSED;
+    if (ce && !enter_seen) {
+      enter_seen = 1;
+      if (sel == 0)
+        return;
+      if ((fm_is_protected(idx) && sel == 1) ||
+          (!fm_is_protected(idx) && sel == 2)) {
+        fm_show_information(idx);
+      } else if (!fm_is_protected(idx) && sel == 1) {
+        fm_wait_keys_released(120);
+        alert_show("FILE", "Stay tuned");
+      } else if (!fm_is_protected(idx) && sel == 3) {
+        char perm[8];
+        fm_format_permission(idx, perm, sizeof(perm));
+        if (strchr(perm, 'w') == NULL) {
+          fm_wait_keys_released(120);
+          alert_show("FILE", "Permission denied");
+        } else {
+          fm_wait_keys_released(120);
+          if (confirm_show("FILE", "Confirm to delete the file or folder?")) {
+            char full_path[FM_PATH_LEN + FM_NAME_LEN];
+            fm_build_full_path(fm_items[idx], full_path, sizeof(full_path));
+            FRESULT res = FMCore_Delete(full_path, true, false);
+            if (res == FR_OK) {
+              fm_load_dir();
+              if (sel_io && *sel_io >= fm_count)
+                *sel_io = fm_count > 0 ? fm_count - 1 : 0;
+              return;
+            }
+            char err[48];
+            snprintf(err, sizeof(err), "Delete failed (%d)", (int)res);
+            alert_show("FILE", err);
+          }
+        }
+      }
+      fm_wait_keys_released(120);
+    } else if (!ce) {
+      enter_seen = 0;
+    }
+    if (HAL_GetTick() - lu > 80U) {
+      lu = HAL_GetTick();
+      fm_show_menu_frame(sel, items, count);
+    }
+    JPDelay(1);
+  }
 }
 
 static void fm_push_parent_selection(int sel) {
@@ -306,6 +503,8 @@ static void fm_load_dir(void) {
   /* Always show .. for navigation/exit. Keep it at index 0. */
   strcpy(fm_items[0], "..");
   fm_is_dir[0] = 1;
+  fm_size[0] = 0;
+  fm_attr[0] = AM_DIR;
   fm_count = 1;
 
   FMCore_Entry entries[FM_MAX_ITEMS - 1];
@@ -322,6 +521,8 @@ static void fm_load_dir(void) {
     strncpy(fm_items[idx], entries[i].name, FM_NAME_LEN - 1);
     fm_items[idx][FM_NAME_LEN - 1] = '\0';
     fm_is_dir[idx] = entries[i].is_dir ? 1 : 0;
+    fm_size[idx] = entries[i].size;
+    fm_attr[idx] = entries[i].attr;
   }
 
   /* Sort: directories first, then case-insensitive alphabetical order.
@@ -338,12 +539,20 @@ static void fm_load_dir(void) {
       if (swap) {
         char tn[FM_NAME_LEN];
         int td;
+        uint32_t tsz;
+        uint8_t ta;
         memcpy(tn, fm_items[i], FM_NAME_LEN);
         td = fm_is_dir[i];
+        tsz = fm_size[i];
+        ta = fm_attr[i];
         memcpy(fm_items[i], fm_items[j], FM_NAME_LEN);
         fm_is_dir[i] = fm_is_dir[j];
+        fm_size[i] = fm_size[j];
+        fm_attr[i] = fm_attr[j];
         memcpy(fm_items[j], tn, FM_NAME_LEN);
         fm_is_dir[j] = td;
+        fm_size[j] = tsz;
+        fm_attr[j] = ta;
       }
     }
   }
@@ -355,29 +564,12 @@ static bool fm_enter(int idx, int *sel_io) {
   }
 
   if (!fm_is_dir[idx]) {
-    fm_show_file_path(fm_items[idx]);
+    fm_open_menu(idx, sel_io);
     return false;
   }
 
   if (strcmp(fm_items[idx], "..") == 0) {
-    if (strcmp(fm_cur_path, "/") == 0) {
-      fm_unmount();
-      return true; /* signal exit */
-    }
-
-    fm_trim_to_parent();
-    fm_load_dir();
-
-    int restored = fm_pop_parent_selection();
-    if (restored < 0) {
-      restored = 0;
-    }
-    if (restored >= fm_count) {
-      restored = fm_count > 0 ? fm_count - 1 : 0;
-    }
-    if (sel_io != NULL) {
-      *sel_io = restored;
-    }
+    fm_open_menu(idx, sel_io);
     return false;
   }
 
@@ -397,6 +589,23 @@ static bool fm_enter(int idx, int *sel_io) {
   if (sel_io != NULL) {
     *sel_io = 0;
   }
+  return false;
+}
+
+static bool fm_go_parent(int *sel_io) {
+  if (strcmp(fm_cur_path, "/") == 0) {
+    fm_unmount();
+    return true;
+  }
+  fm_trim_to_parent();
+  fm_load_dir();
+  int restored = fm_pop_parent_selection();
+  if (restored < 0)
+    restored = 0;
+  if (restored >= fm_count)
+    restored = fm_count > 0 ? fm_count - 1 : 0;
+  if (sel_io)
+    *sel_io = restored;
   return false;
 }
 
@@ -449,13 +658,25 @@ void file_manager_run(void) {
         SysHandle_FatalFResult(pr, SYS_ERR_SD_LOST);
       }
     }
-    if (keyManager._btnEnter.getState() == KEY_PRESSED) {
+    KeyState_t enter_state = keyManager._btnEnter.getState();
+    if (enter_state == KEY_PRESSED) {
       if (n == 0) {
         fm_unmount();
         fm_free_context();
         return;
       }
-      bool exit_requested = fm_enter(sel, &sel);
+      bool exit_requested = false;
+      if (fm_is_dir[sel]) {
+        int action = fm_open_folder_menu(sel);
+        if (action == 0) {
+          if (strcmp(fm_items[sel], "..") == 0)
+            exit_requested = fm_go_parent(&sel);
+          else
+            exit_requested = fm_enter(sel, &sel);
+        }
+      } else {
+        exit_requested = fm_enter(sel, &sel);
+      }
       if (exit_requested || !fm_mounted) {
         fm_free_context();
         return; /* exit via .. at root */

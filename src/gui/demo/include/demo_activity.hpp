@@ -29,12 +29,8 @@
 #include "hardware/include/lcd.hpp"
 #include "hardware/include/trtc.hpp"
 #include "gui/demo/include/3dox_activity.hpp"
-#include "gui/demo/include/bmp_activity.hpp"
 #include "gui/demo/include/i2c_activity.hpp"
-#include "gui/demo/include/jyro_activity.hpp"
 #include "include/libpd.h"
-#include "gui/demo/include/sn74hc00n_activity.hpp"
-#include "gui/demo/include/tcs3472_activity.hpp"
 #include <cstdio>
 
 int demo_activity_run(void); // TOS menu, returns 1 if user chose Return
