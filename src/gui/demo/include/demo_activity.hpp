@@ -30,6 +30,7 @@
 #include "hardware/include/trtc.hpp"
 #include "gui/demo/include/3dox_activity.hpp"
 #include "gui/demo/include/i2c_activity.hpp"
+#include "gui/demo/include/tvid_activity.hpp"
 #include "include/libpd.h"
 #include <cstdio>
 

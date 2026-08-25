@@ -330,7 +330,7 @@ FRESULT FMCore_ReadFile(const char *path, void *buf, uint32_t max_len,
   if (!buf || max_len == 0U) return FR_INVALID_PARAMETER;
   res = translate_path(path, physical, sizeof(physical), &kind);
   if (res != FR_OK || kind == FM_PATH_VIRTUAL_ROOT) return FR_INVALID_OBJECT;
-  if (kind == FM_PATH_TMP || kind == FM_PATH_DATA) return FR_NO_PATH;
+  if (kind == FM_PATH_TMP) return FR_NO_PATH;
   res = f_open(&fp, physical, FA_READ);
   if (res == FR_OK) {
     res = f_read(&fp, buf, (UINT)max_len, &br);

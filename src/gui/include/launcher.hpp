@@ -34,7 +34,7 @@
 #include <cstring>
 #include "core/sys/include/syslog.h"
 
-// Run the pet launcher loop. Returns when user long-presses Enter.
+// Run the HOME app grid. Returns when the TOS app is selected.
 void petLauncherRun(void);
 
 #endif

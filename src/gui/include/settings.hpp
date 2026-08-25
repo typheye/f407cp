@@ -32,6 +32,7 @@
 #include "gui/settings/include/sound_activity.hpp"
 #include "gui/settings/include/time_activity.hpp"
 #include "gui/settings/include/about_activity.hpp"
+#include "gui/settings/include/application_activity.hpp"
 #include <cstdio>
 #include "core/sys/include/syslog.h"
 #include "core/sys/include/systime.h"

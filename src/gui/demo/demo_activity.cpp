@@ -35,15 +35,17 @@ extern LED whiteLed;
 
 static void led_test_activity(void);
 
-#define DEMO_ITEMS 4
+#define DEMO_ITEMS 5
 static const char *demo_m[DEMO_ITEMS] = {
     "00 Return", "01 LED Test", "02 I2C Scan", "03 3D Path Tracer",
+    "04 TVID Test",
 };
 static void (*demo_f[DEMO_ITEMS])(void) = {
     NULL,
     led_test_activity,
     i2c_scan_activity,
     render_3dox_activity_with_exit,
+    tvid_test_activity,
 };
 
 // ============ Original TOS-style menu ============

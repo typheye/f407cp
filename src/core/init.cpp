@@ -2,6 +2,7 @@
 
 #include "include/init.hpp"
 #include "core/manager/include/emotion_manager.h"
+#include "core/manager/include/app_manager.h"
 #include "core/manager/include/file_manager.h"
 #include "core/manager/include/settings_manager.h"
 #include "core/sdk/include/tos_api.h"
@@ -82,6 +83,7 @@ void APP::init() {
   }
 
   SM_Mount();
+  (void)AppManager_Init();
 
   if (SM_BootGfx() && !SM_SoundMute()) buzzer1.beepSuccess();
   EmotionManager_Init();

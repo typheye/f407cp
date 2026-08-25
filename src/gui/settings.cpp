@@ -28,10 +28,10 @@
 extern KeyManager keyManager;
 extern LCD boardLCD;
 
-#define SET_N 6
+#define SET_N 7
 static const char *set_m[SET_N] = {
-    "00 Return", "01 Storage", "02 Display",
-    "03 Sound & GFX", "04 Date & Time", "05 About & More",
+    "00 Return", "01 Storage", "02 Display", "03 Application",
+    "04 Sound & GFX", "05 Date & Time", "06 About & More",
 };
 
 void settings_run(void) {
@@ -47,12 +47,15 @@ void settings_run(void) {
       display_activity_run();
     }
     if (sel == 3) {
-      sound_activity_run();
+      application_activity_run();
     }
     if (sel == 4) {
-      time_activity_run();
+      sound_activity_run();
     }
     if (sel == 5) {
+      time_activity_run();
+    }
+    if (sel == 6) {
       about_activity_run();
     }
   }

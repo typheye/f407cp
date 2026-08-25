@@ -37,7 +37,6 @@ extern LCD boardLCD;
 #define FM_STACK_DEPTH 8
 #define FM_DISPLAY_LIMIT 15
 
-static FATFS fm_fs;
 static bool fm_mounted = false;
 static void fm_load_dir(void);
 
@@ -190,7 +189,7 @@ static void fm_fatal_if_storage_error(FRESULT res, uint32_t fallback) {
 
 static FRESULT fm_mount_result(void) {
   if (!fm_mounted) {
-    FRESULT res = FMCore_Mount(&fm_fs, false);
+    FRESULT res = FMCore_MountStorage(NULL, false);
     if (res == FR_OK) {
       fm_mounted = true;
     }
@@ -206,7 +205,7 @@ static void fm_mount(void) {
 
 static void fm_unmount(void) {
   if (fm_mounted) {
-    FMCore_Unmount();
+    /* The system owns the shared FatFs mount; the browser only borrows it. */
     fm_mounted = false;
   }
 }
