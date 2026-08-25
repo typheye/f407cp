@@ -21,6 +21,7 @@
  */
 
 #include "include/display_activity.hpp"
+#include "hardware/include/oled12864.hpp"
 #include "library/include/libdly.h"
 #include "library/include/libui.h"
 
@@ -32,17 +33,18 @@ static bool disp_inited = false; // only apply defaults first time
 
 static const char *auto_close_names[] = {"OFF", "ON"};
 static const char *delay_names[] = {"15s", "30s", "1min", "2min", "5min", "10min"};
+static const char *oled_mode_names[] = {"OFF", "CLOCK", "LOG"};
 
 static void apply(void) {
   boardLCD.setBrightness((uint16_t)disp_bright * 100);
 }
 
 static int item_count(void) {
-  return 5; // Return + Brightness + Resolution + AutoClose + Delay
+  return 6; // Return + Brightness + Resolution + AutoClose + Delay + OLED
 }
 
 static void draw_disp(int sel, bool editing, int edit_field, bool auto_close,
-                      uint8_t sleep_delay) {
+                      uint8_t sleep_delay, uint8_t oled_mode) {
   LCD_FLUSH({
     UI_DrawFrameTitle("DISP");
     PD_SetFont(FONT_ASCII_16);
@@ -83,6 +85,11 @@ static void draw_disp(int sel, bool editing, int edit_field, bool auto_close,
                            editing && edit_field == 4, !auto_close);
         break;
       }
+      case 5:
+        UI_DrawMenuValue(idx, sel, cy, "04 OLED",
+                         oled_mode_names[oled_mode],
+                         editing && edit_field == 5);
+        break;
       }
     }
     UI_DrawStdFooter();
@@ -99,6 +106,7 @@ void display_activity_run(void) {
   boardLCD.setBrightness((uint16_t)disp_bright * 100);
   bool auto_close = SM_Disp_AutoClose();
   uint8_t sleep_delay = SM_Disp_CloseDelay();
+  uint8_t oled_mode = SM_OledMode();
   bool editing = false;
   int edit_field = 0;
 
@@ -119,6 +127,8 @@ void display_activity_run(void) {
           auto_close = true;
         } else if (edit_field == 4) {
           sleep_delay = (uint8_t)((sleep_delay + 1U) % 6U);
+        } else if (edit_field == 5) {
+          oled_mode = (uint8_t)((oled_mode + 1U) % 3U);
         }
       } else {
         sel = (sel + 1) % item_count();
@@ -137,6 +147,8 @@ void display_activity_run(void) {
           auto_close = false;
         } else if (edit_field == 4) {
           sleep_delay = (uint8_t)((sleep_delay + 5U) % 6U);
+        } else if (edit_field == 5) {
+          oled_mode = (uint8_t)((oled_mode + 2U) % 3U);
         }
       } else {
         sel = (sel - 1 + item_count()) % item_count();
@@ -147,9 +159,14 @@ void display_activity_run(void) {
 
     if (keyManager._btnEnter.getState() == KEY_PRESSED) {
       if (editing) {
+        const int confirmed_field = edit_field;
         editing = false;
         edit_field = 0;
         SM_Disp_SetConfig((uint8_t)disp_bright, auto_close, sleep_delay);
+        if (confirmed_field == 5) {
+          SM_SetOledMode(oled_mode);
+          Oled12864_SetMode(oled_mode);
+        }
         boardLCD.setBrightness((uint16_t)disp_bright * 100);
         dirty = true;
       } else {
@@ -168,13 +185,18 @@ void display_activity_run(void) {
           editing = true;
           edit_field = 4;
         }
+        if (sel == 5) {
+          oled_mode = SM_OledMode();
+          editing = true;
+          edit_field = 5;
+        }
         dirty = true;
       }
     }
     if (dirty || HAL_GetTick() - lu > 80U) {
       lu = HAL_GetTick();
       dirty = false;
-      draw_disp(sel, editing, edit_field, auto_close, sleep_delay);
+      draw_disp(sel, editing, edit_field, auto_close, sleep_delay, oled_mode);
     }
     JPDelay(1);
   }

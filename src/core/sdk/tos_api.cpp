@@ -5,7 +5,7 @@
 #include "hardware/include/cdc_bridge.h"
 #include "hardware/include/key.hpp"
 #include "hardware/include/lcd.hpp"
-#include "hardware/include/secondary_clock.hpp"
+#include "hardware/include/oled12864.hpp"
 
 namespace {
 bool api_initialized;
@@ -111,7 +111,7 @@ void TosApi_Tick(void) {
   }
   keyManager.tick();
   CDC_Bridge_Tick();
-  SecondaryClock_Tick();
+  Oled12864_Tick();
   uint32_t now = HAL_GetTick();
   bool key1_raw_down = keyManager.spare.isPressed();
   bool key1_pressed_edge = power_key_pressed_edge(now, key1_raw_down);
@@ -122,7 +122,7 @@ void TosApi_Tick(void) {
       }
     } else if (key1_pressed_edge) {
       boardLCD.wake();
-      SecondaryClock_SetDisplayOn(true);
+      Oled12864_SetDisplayOn(true);
       screen_sleeping = false;
       wake_key_suppressed = true;
       wake_guard_until_ms = now + 150U;
@@ -130,7 +130,7 @@ void TosApi_Tick(void) {
     }
   } else {
     if (key1_pressed_edge) {
-      SecondaryClock_SetDisplayOn(false);
+      Oled12864_SetDisplayOn(false);
       boardLCD.sleep();
       screen_sleeping = true;
       wake_key_suppressed = true;
@@ -140,7 +140,7 @@ void TosApi_Tick(void) {
       last_user_activity_ms = now;
     } else if (SM_Disp_AutoClose() &&
         (uint32_t)(now - last_user_activity_ms) >= disp_sleep_timeout_ms()) {
-      SecondaryClock_SetDisplayOn(false);
+      Oled12864_SetDisplayOn(false);
       boardLCD.sleep();
       screen_sleeping = true;
       wake_key_suppressed = power_key_stable_down;

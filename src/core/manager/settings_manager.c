@@ -95,7 +95,9 @@ static void sanitize(void) {
   g_settings.time_style_24h = g_settings.time_style_24h ? true : false;
   g_settings.boot_gfx = g_settings.boot_gfx ? true : false;
   g_settings.sound_mute = g_settings.sound_mute ? true : false;
-  g_settings._reserved = 0U;
+  if (g_settings.oled_mode > SM_OLED_LOG) {
+    g_settings.oled_mode = SM_OLED_CLOCK;
+  }
   g_settings.magic = SM_MAGIC;
   g_settings.crc = settings_crc(&g_settings);
 }
@@ -110,6 +112,7 @@ static void defaults(void) {
   g_settings.time_style_24h = true;
   g_settings.boot_gfx = true;
   g_settings.sound_mute = false;
+  g_settings.oled_mode = SM_OLED_CLOCK;
   sanitize();
   LOG_D("SMGR", "Defaults loaded");
 }
@@ -125,6 +128,7 @@ static bool settings_to_json(char *out, uint32_t out_sz) {
   json_writer_add_bool(&w, "time_style_24h", g_settings.time_style_24h);
   json_writer_add_bool(&w, "boot_gfx", g_settings.boot_gfx);
   json_writer_add_bool(&w, "sound_mute", g_settings.sound_mute);
+  json_writer_add_int(&w, "oled_mode", (int)g_settings.oled_mode);
   json_writer_end(&w);
   return json_writer_ok(&w);
 }
@@ -143,6 +147,8 @@ static void settings_from_json(const char *json) {
   g_settings.boot_gfx = json_get_bool(json, "boot_gfx", g_settings.boot_gfx);
   g_settings.sound_mute =
       json_get_bool(json, "sound_mute", g_settings.sound_mute);
+  g_settings.oled_mode =
+      (uint8_t)json_get_int(json, "oled_mode", g_settings.oled_mode);
   sanitize();
 }
 
@@ -305,11 +311,11 @@ static bool load(void) {
   g_have_saved_crc = true;
   LOG_I("SMGR", "Loaded JSON from SD OK (%luB)", (unsigned long)len);
   sm_trace("json loaded: bright=%u sleep=0x%02X dash=%u log=%u 24h=%u boot=%u "
-           "mute=%u",
+           "mute=%u oled=%u",
            g_settings.disp_bright, g_settings.disp_sleep_cfg,
            g_settings.debug_dashboard, g_settings.debug_log_com,
            g_settings.time_style_24h ? 1U : 0U, g_settings.boot_gfx ? 1U : 0U,
-           g_settings.sound_mute ? 1U : 0U);
+           g_settings.sound_mute ? 1U : 0U, g_settings.oled_mode);
   return true;
 }
 
@@ -410,7 +416,8 @@ void SM_Save(void) {
         json_get_int(verify, "schema", 0) == 1 &&
         json_get_int(verify, "disp_bright", -1) == g_settings.disp_bright &&
         json_get_int(verify, "disp_sleep_cfg", -1) ==
-            g_settings.disp_sleep_cfg) {
+            g_settings.disp_sleep_cfg &&
+        json_get_int(verify, "oled_mode", -1) == g_settings.oled_mode) {
       g_sd_available = true;
       g_last_saved_crc = g_settings.crc;
       g_have_saved_crc = true;
@@ -482,6 +489,16 @@ void SM_SetSoundMute(bool v) {
   v = v ? true : false;
   if (g_settings.sound_mute != v) {
     g_settings.sound_mute = v;
+    SM_Save();
+  }
+}
+
+uint8_t SM_OledMode(void) { return g_settings.oled_mode; }
+void SM_SetOledMode(uint8_t mode) {
+  if (mode > SM_OLED_LOG)
+    mode = SM_OLED_CLOCK;
+  if (g_settings.oled_mode != mode) {
+    g_settings.oled_mode = mode;
     SM_Save();
   }
 }

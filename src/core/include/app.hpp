@@ -30,7 +30,7 @@
 #include "hardware/include/lcd.hpp"
 #include "hardware/include/led.hpp"
 #include "hardware/include/ssd1315.hpp"
-#include "hardware/include/secondary_clock.hpp"
+#include "hardware/include/oled12864.hpp"
 #include "library/include/liboledgfx.h"
 #include "gui/include/sysui.hpp"
 

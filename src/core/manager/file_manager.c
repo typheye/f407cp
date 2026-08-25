@@ -420,6 +420,51 @@ static FRESULT delete_physical_recursive(const char *path) {
   return f_unlink(path);
 }
 
+static bool root_name_is(const char *name, const char *expected) {
+  while (*name && *expected) {
+    char a = *name++;
+    char b = *expected++;
+    if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+    if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+    if (a != b) return false;
+  }
+  return *name == '\0' && *expected == '\0';
+}
+
+static bool root_entry_is_kept(const char *name) {
+  return root_name_is(name, "data") || root_name_is(name, "storage") ||
+         root_name_is(name, "tmp") || root_name_is(name, "init");
+}
+
+static FRESULT repair_storage_root(void) {
+  for (;;) {
+    DIR dir;
+    FILINFO entry;
+    char path[FMCORE_PATH_MAX];
+    bool found = false;
+    FRESULT res = f_opendir(&dir, "0:/");
+    if (res != FR_OK) return res;
+    while ((res = f_readdir(&dir, &entry)) == FR_OK && entry.fname[0]) {
+      if (!strcmp(entry.fname, ".") || !strcmp(entry.fname, "..") ||
+          root_entry_is_kept(entry.fname))
+        continue;
+      if (!FMCore_JoinPath("0:", entry.fname, path, sizeof(path))) {
+        res = FR_INVALID_NAME;
+      } else {
+        found = true;
+      }
+      break;
+    }
+    (void)f_closedir(&dir);
+    if (res != FR_OK) return res;
+    if (!found) return FR_OK;
+    LOG_W("FMCR", "removing unexpected root entry: %s", path);
+    res = delete_physical_recursive(path);
+    if (res != FR_OK) return res;
+    SysWatchdog_Tick();
+  }
+}
+
 FRESULT FMCore_Delete(const char *path, bool recursive, bool fatal_on_storage_error) {
   char physical[FMCORE_PATH_MAX];
   FMPathKind kind;
@@ -522,6 +567,8 @@ FRESULT FMCore_PrepareSystemStorage(void) {
   /* Match REC's post-format layout.  /init remains REC-owned and is only
    * validated by FMCore_IsInitialized; SYSTEM never fabricates it. */
   if (!FMCore_IsInitialized()) return FR_NOT_READY;
+  res = repair_storage_root();
+  if (res != FR_OK) return res;
   res = f_mkdir("0:/data");
   if (res != FR_OK && res != FR_EXIST) return res;
   res = f_mkdir("0:/tmp");

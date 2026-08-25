@@ -57,7 +57,7 @@ set(USER_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/tsdio.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/sfhd.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/cdc_bridge.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/secondary_clock.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/hardware/oled12864.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libdly.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/library/libvan.c

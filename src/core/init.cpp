@@ -10,7 +10,7 @@
 #include "hardware/include/cdc_bridge.h"
 #include "hardware/include/key.hpp"
 #include "hardware/include/lcd.hpp"
-#include "hardware/include/secondary_clock.hpp"
+#include "hardware/include/oled12864.hpp"
 #include "hardware/include/sfhd.h"
 #include "hardware/include/tsdio.hpp"
 #include "library/include/libdly.h"
@@ -81,7 +81,6 @@ void APP::init() {
     LOG_W("SDIO", "card initialization failed (%d)", (int)sd_status);
   }
 
-  /* No REC transition, formatting, root cleanup, or destructive recovery. */
   SM_Mount();
 
   if (SM_BootGfx() && !SM_SoundMute()) buzzer1.beepSuccess();
@@ -97,7 +96,7 @@ void APP::init() {
   JPDelay(250);
   PD_SplashFinish(220U);
   boardLCD.setBrightness((uint16_t)SM_Disp_Bright() * 100U);
-  SecondaryClock_Init();
+  Oled12864_Init();
   SysUI_DebugOverlaySetEnabled(SM_Debug_Dashboard() ? 1U : 0U);
   SysUI::setActivity(UI_PET);
 }

@@ -30,8 +30,14 @@ typedef struct __attribute__((packed, aligned(4))) {
   bool     time_style_24h;
   bool     boot_gfx;
   bool     sound_mute;
-  uint8_t  _reserved;
+  uint8_t  oled_mode;
 } Settings_t;
+
+typedef enum {
+  SM_OLED_OFF = 0,
+  SM_OLED_CLOCK = 1,
+  SM_OLED_LOG = 2
+} SM_OledMode_t;
 
 void SM_Init(void);
 void SM_Mount(void);
@@ -59,6 +65,8 @@ bool SM_BootGfx(void);
 void SM_SetBootGfx(bool v);
 bool SM_SoundMute(void);
 void SM_SetSoundMute(bool v);
+uint8_t SM_OledMode(void);
+void SM_SetOledMode(uint8_t mode);
 
 #ifdef __cplusplus
 }
