@@ -10,6 +10,7 @@ $BuildRoot = Join-Path $ProjectRoot "build"
 $DistRoot = Join-Path $ProjectRoot "dist"
 $PlatformTools = Join-Path $DistRoot "platform-tools"
 $SourceRoot = Join-Path $ProjectRoot "src"
+$Tools = @("tvidtool", "sbltool", "tdb")
 
 if ($env:CONDA_DEFAULT_ENV -ne "f407cp") {
     $conda = Get-Command conda.exe -ErrorAction SilentlyContinue
@@ -48,7 +49,7 @@ function Invoke-PyInstallerSpec {
 }
 
 try {
-    & python -c "import PyInstaller, cv2, numpy"
+    & python -c "import PyInstaller, cv2, numpy, serial"
     if ($LASTEXITCODE -ne 0) {
         throw "Missing build dependency. Run: python -m pip install -r requirement.txt"
     }
@@ -61,18 +62,22 @@ try {
     }
     New-Item -ItemType Directory -Path $PlatformTools -Force | Out-Null
 
-    Invoke-PyInstallerSpec `
-        -SpecPath (Join-Path $SourceRoot "tvidtool\tvidtool.spec") `
-        -DistPath $PlatformTools `
-        -WorkName "tvidtool"
-
-    $Tool = Join-Path $PlatformTools "tvidtool.exe"
-    if (-not (Test-Path $Tool -PathType Leaf)) {
-        throw "Expected output was not generated: $Tool"
+    foreach ($Name in $Tools) {
+        Invoke-PyInstallerSpec `
+            -SpecPath (Join-Path $SourceRoot "$Name\$Name.spec") `
+            -DistPath $PlatformTools `
+            -WorkName $Name
     }
-    & $Tool --version | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Tool version test failed."
+
+    foreach ($Name in $Tools) {
+        $Tool = Join-Path $PlatformTools "$Name.exe"
+        if (-not (Test-Path $Tool -PathType Leaf)) {
+            throw "Expected output was not generated: $Tool"
+        }
+        & $Tool --version | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "$Tool version test failed."
+        }
     }
 
     if ($Install) {
@@ -81,13 +86,17 @@ try {
         }
         $ScriptsDir = Join-Path $env:CONDA_PREFIX "Scripts"
         New-Item -ItemType Directory -Path $ScriptsDir -Force | Out-Null
-        Copy-Item $Tool $ScriptsDir -Force
-        Write-Host "Installed tvidtool.exe to $ScriptsDir" -ForegroundColor Green
+        foreach ($Name in $Tools) {
+            Copy-Item (Join-Path $PlatformTools "$Name.exe") $ScriptsDir -Force
+        }
+        Write-Host "Installed $($Tools -join ', ') to $ScriptsDir" -ForegroundColor Green
     }
 
     Write-Host ""
     Write-Host "Build complete:" -ForegroundColor Green
-    Write-Host "  dist\platform-tools\tvidtool.exe"
+    foreach ($Name in $Tools) {
+        Write-Host "  dist\platform-tools\$Name.exe"
+    }
 }
 catch {
     Write-Error $_

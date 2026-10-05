@@ -1,5 +1,14 @@
 # F407CP PC Tools
 
+Command-line host tools for the STM32F407 firmware, packaged as standalone
+Windows executables with PyInstaller.
+
+| Tool       | Description                                                        |
+| ---------- | ------------------------------------------------------------------ |
+| `tvidtool` | Convert a normal video into a `.tvid` stream for SD-card playback. |
+| `sbltool`  | SBL FASTBOOT USB CDC flash protocol host.                          |
+| `tdb`      | TOS Debug Bridge REC USB CDC host for filesystem/settings/diag.    |
+
 ## TVID Tool
 
 Convert a normal video into a `.tvid` stream that the STM32F407 firmware can
@@ -27,3 +36,22 @@ valid.
 
 Note: regenerate existing `.tvid` files with the current tool. The firmware fast
 path expects LCD-ready big-endian RGB565 payloads.
+
+## SBL Tool / TDB
+
+Both tools talk to the board over USB CDC using `pyserial`. Run them from source
+directly:
+
+```powershell
+python src\sbltool\app.py --help
+python src\tdb\app.py --help
+```
+
+## Build
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build.ps1
+```
+
+This builds `tvidtool.exe`, `sbltool.exe` and `tdb.exe` into
+`dist\platform-tools\`.
