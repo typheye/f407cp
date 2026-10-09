@@ -1,0 +1,8 @@
+{
+  "name": "japkit",
+  "display_name": "JAPKit",
+  "version": "1.0.0",
+  "developer": "JanPNP Development Team",
+  "description": "JanPNP desktop debugging tool",
+  "executable": "JAPKit"
+}
